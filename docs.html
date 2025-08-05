@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Screenshot API Documentation</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'primary': '#3B82F6',
+                        'secondary': '#1E40AF',
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gray-50 text-gray-900">
+    <!-- Header -->
+    <header class="bg-gradient-to-r from-blue-600 to-blue-800 text-white shadow-lg">
+        <div class="container mx-auto px-6 py-8">
+            <h1 class="text-4xl font-bold mb-2">📸 Screenshot API</h1>
+            <p class="text-xl text-blue-100">Capture website screenshots with advanced configuration options</p>
+        </div>
+    </header>
+
+    <!-- Navigation -->
+    <nav class="bg-white shadow-sm border-b sticky top-0 z-10">
+        <div class="container mx-auto px-6">
+            <div class="flex space-x-8 py-4">
+                <a href="#overview" class="text-blue-600 hover:text-blue-800 font-medium">Overview</a>
+                <a href="#endpoints" class="text-blue-600 hover:text-blue-800 font-medium">Endpoints</a>
+                <a href="#examples" class="text-blue-600 hover:text-blue-800 font-medium">Examples</a>
+                <a href="#parameters" class="text-blue-600 hover:text-blue-800 font-medium">Parameters</a>
+                <a href="#optimization" class="text-blue-600 hover:text-blue-800 font-medium">Optimization</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto px-6 py-8">
+        <!-- Overview Section -->
+        <section id="overview" class="mb-12">
+            <div class="bg-white rounded-lg shadow-lg p-8">
+                <h2 class="text-3xl font-bold mb-6 text-gray-800">🚀 Overview</h2>
+                <div class="grid md:grid-cols-2 gap-8">
+                    <div>
+                        <h3 class="text-xl font-semibold mb-4 text-blue-600">Features</h3>
+                        <ul class="space-y-2">
+                            <li class="flex items-center"><span class="text-green-500 mr-2">✓</span> High-quality website screenshots</li>
+                            <li class="flex items-center"><span class="text-green-500 mr-2">✓</span> Multiple image formats (PNG, JPEG)</li>
+                            <li class="flex items-center"><span class="text-green-500 mr-2">✓</span> Custom viewport sizes</li>
+                            <li class="flex items-center"><span class="text-green-500 mr-2">✓</span> Full page capture</li>
+                            <li class="flex items-center"><span class="text-green-500 mr-2">✓</span> Performance optimization options</li>
+                            <li class="flex items-center"><span class="text-green-500 mr-2">✓</span> Automatic file saving</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-semibold mb-4 text-blue-600">Base URL</h3>
+                        <div class="bg-gray-100 p-4 rounded-lg font-mono text-sm">
+                            http://localhost:3000
+                        </div>
+                        <h3 class="text-xl font-semibold mb-4 mt-6 text-blue-600">Quick Start</h3>
+                        <p class="text-gray-600">Send a POST request to <code class="bg-gray-200 px-2 py-1 rounded">/screenshot</code> with a JSON payload containing the URL you want to capture.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Endpoints Section -->
+        <section id="endpoints" class="mb-12">
+            <div class="bg-white rounded-lg shadow-lg p-8">
+                <h2 class="text-3xl font-bold mb-6 text-gray-800">🔗 API Endpoints</h2>
+                
+                <!-- Screenshot Endpoint -->
+                <div class="mb-8 border-l-4 border-blue-500 pl-6">
+                    <div class="flex items-center mb-4">
+                        <span class="bg-green-500 text-white px-3 py-1 rounded-full text-sm font-medium mr-4">POST</span>
+                        <code class="text-xl font-mono text-gray-800">/screenshot</code>
+                    </div>
+                    <p class="text-gray-600 mb-4">Capture a screenshot of a website with customizable options.</p>
+                    
+                    <h4 class="font-semibold mb-2 text-gray-800">Request Headers</h4>
+                    <div class="bg-gray-100 p-4 rounded-lg mb-4">
+                        <code class="text-sm">Content-Type: application/json</code>
+                    </div>
+
+                    <h4 class="font-semibold mb-2 text-gray-800">Response</h4>
+                    <div class="bg-gray-900 text-green-400 p-4 rounded-lg overflow-x-auto">
+                        <pre class="text-sm"><code>{
+  "success": true,
+  "screenshot": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...",
+  "url": "https://example.com",
+  "dimensions": { "width": 1920, "height": 1080 },
+  "fullPage": false,
+  "savedAs": "screenshot-2025-07-21T15-30-45-123Z.png",
+  "filepath": "/path/to/screenshot-2025-07-21T15-30-45-123Z.png",
+  "processingTime": "3450ms",
+  "settings": {
+    "waitStrategy": "networkidle2",
+    "maxWaitTime": 10000,
+    "blockResources": false
+  }
+}</code></pre>
+                    </div>
+                </div>
+
+                <!-- Health Endpoint -->
+                <div class="border-l-4 border-green-500 pl-6">
+                    <div class="flex items-center mb-4">
+                        <span class="bg-blue-500 text-white px-3 py-1 rounded-full text-sm font-medium mr-4">GET</span>
+                        <code class="text-xl font-mono text-gray-800">/health</code>
+                    </div>
+                    <p class="text-gray-600 mb-4">Check the API health status.</p>
+                    
+                    <h4 class="font-semibold mb-2 text-gray-800">Response</h4>
+                    <div class="bg-gray-900 text-green-400 p-4 rounded-lg">
+                        <pre class="text-sm"><code>{
+  "status": "OK",
+  "timestamp": "2025-07-21T15:30:45.123Z"
+}</code></pre>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Parameters Section -->
+        <section id="parameters" class="mb-12">
+            <div class="bg-white rounded-lg shadow-lg p-8">
+                <h2 class="text-3xl font-bold mb-6 text-gray-800">⚙️ Request Parameters</h2>
+                
+                <div class="overflow-x-auto">
+                    <table class="w-full border-collapse border border-gray-200">
+                        <thead>
+                            <tr class="bg-gray-50">
+                                <th class="border border-gray-200 px-4 py-3 text-left font-semibold">Parameter</th>
+                                <th class="border border-gray-200 px-4 py-3 text-left font-semibold">Type</th>
+                                <th class="border border-gray-200 px-4 py-3 text-left font-semibold">Default</th>
+                                <th class="border border-gray-200 px-4 py-3 text-left font-semibold">Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="border border-gray-200 px-4 py-3 font-mono text-sm bg-red-50">url*</td>
+                                <td class="border border-gray-200 px-4 py-3">string</td>
+                                <td class="border border-gray-200 px-4 py-3 text-gray-500">-</td>
+                                <td class="border border-gray-200 px-4 py-3">The URL of the website to screenshot</td>
+                            </tr>
+                            <tr class="bg-gray-50">
+                                <td class="border border-gray-200 px-4 py-3 font-mono text-sm">width</td>
+                                <td class="border border-gray-200 px-4 py-3">number</td>
+                                <td class="border border-gray-200 px-4 py-3">1920</td>
+                                <td class="border border-gray-200 px-4 py-3">Viewport width in pixels</td>
+                            </tr>
+                            <tr>
+                                <td class="border border-gray-200 px-4 py-3 font-mono text-sm">height</td>
+                                <td class="border border-gray-200 px-4 py-3">number</td>
+                                <td class="border border-gray-200 px-4 py-3">1080</td>
+                                <td class="border border-gray-200 px-4 py-3">Viewport height in pixels</td>
+                            </tr>
+                            <tr class="bg-gray-50">
+                                <td class="border border-gray-200 px-4 py-3 font-mono text-sm">fullPage</td>
+                                <td class="border border-gray-200 px-4 py-3">boolean</td>
+                                <td class="border border-gray-200 px-4 py-3">false</td>
+                                <td class="border border-gray-200 px-4 py-3">Capture the entire page length</td>
+                            </tr>
+                            <tr>
+                                <td class="border border-gray-200 px-4 py-3 font-mono text-sm">format</td>
+                                <td class="border border-gray-200 px-4 py-3">string</td>
+                                <td class="border border-gray-200 px-4 py-3">png</td>
+                                <td class="border border-gray-200 px-4 py-3">Image format: 'png' or 'jpeg'</td>
+                            </tr>
+                            <tr class="bg-gray-50">
+                                <td class="border border-gray-200 px-4 py-3 font-mono text-sm">waitStrategy</td>
+                                <td class="border border-gray-200 px-4 py-3">string</td>
+                                <td class="border border-gray-200 px-4 py-3">networkidle2</td>
+                                <td class="border border-gray-200 px-4 py-3">'networkidle0', 'networkidle2', 'domcontentloaded'</td>
+                            </tr>
+                            <tr>
+                                <td class="border border-gray-200 px-4 py-3 font-mono text-sm">maxWaitTime</td>
+                                <td class="border border-gray-200 px-4 py-3">number</td>
+                                <td class="border border-gray-200 px-4 py-3">10000</td>
+                                <td class="border border-gray-200 px-4 py-3">Max wait time in milliseconds</td>
+                            </tr>
+                            <tr class="bg-gray-50">
+                                <td class="border border-gray-200 px-4 py-3 font-mono text-sm">blockResources</td>
+                                <td class="border border-gray-200 px-4 py-3">boolean</td>
+                                <td class="border border-gray-200 px-4 py-3">false</td>
+                                <td class="border border-gray-200 px-4 py-3">Block CSS, fonts, images for faster loading</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                    <p class="text-red-800"><strong>*</strong> Required parameter</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Examples Section -->
+        <section id="examples" class="mb-12">
+            <div class="bg-white rounded-lg shadow-lg p-8">
+                <h2 class="text-3xl font-bold mb-6 text-gray-800">💡 Usage Examples</h2>
+                
+                <!-- Basic Example -->
+                <div class="mb-8">
+                    <h3 class="text-xl font-semibold mb-4 text-blue-600">📱 Basic Screenshot</h3>
+                    <p class="text-gray-600 mb-4">Simple website screenshot with default settings.</p>
+                    <div class="bg-gray-900 text-green-400 p-4 rounded-lg">
+                        <pre class="text-sm"><code>curl -X POST http://localhost:3000/screenshot \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://example.com"
+  }'</code></pre>
+                    </div>
+                </div>
+
+                <!-- Mobile Example -->
+                <div class="mb-8">
+                    <h3 class="text-xl font-semibold mb-4 text-blue-600">📱 Mobile Viewport</h3>
+                    <p class="text-gray-600 mb-4">Capture a screenshot as it would appear on mobile devices.</p>
+                    <div class="bg-gray-900 text-green-400 p-4 rounded-lg">
+                        <pre class="text-sm"><code>{
+  "url": "https://github.com",
+  "width": 375,
+  "height": 667,
+  "format": "png"
+}</code></pre>
+                    </div>
+                </div>
+
+                <!-- Full Page Example -->
+                <div class="mb-8">
+                    <h3 class="text-xl font-semibold mb-4 text-blue-600">📄 Full Page Screenshot</h3>
+                    <p class="text-gray-600 mb-4">Capture the entire page length, not just the viewport.</p>
+                    <div class="bg-gray-900 text-green-400 p-4 rounded-lg">
+                        <pre class="text-sm"><code>{
+  "url": "https://news.ycombinator.com",
+  "fullPage": true,
+  "width": 1366,
+  "height": 768
+}</code></pre>
+                    </div>
+                </div>
+
+                <!-- Fast Mode Example -->
+                <div class="mb-8">
+                    <h3 class="text-xl font-semibold mb-4 text-blue-600">⚡ Fast Mode</h3>
+                    <p class="text-gray-600 mb-4">Optimized for speed - blocks resources and uses minimal wait time.</p>
+                    <div class="bg-gray-900 text-green-400 p-4 rounded-lg">
+                        <pre class="text-sm"><code>{
+  "url": "https://example.com",
+  "waitStrategy": "domcontentloaded",
+  "maxWaitTime": 1000,
+  "blockResources": true,
+  "format": "jpeg"
+}</code></pre>
+                    </div>
+                </div>
+
+                <!-- High Quality Example -->
+                <div class="mb-8">
+                    <h3 class="text-xl font-semibold mb-4 text-blue-600">🎯 High Quality</h3>
+                    <p class="text-gray-600 mb-4">Best quality screenshot with thorough page loading.</p>
+                    <div class="bg-gray-900 text-green-400 p-4 rounded-lg">
+                        <pre class="text-sm"><code>{
+  "url": "https://react-app.com",
+  "width": 2560,
+  "height": 1440,
+  "waitStrategy": "networkidle0",
+  "maxWaitTime": 15000,
+  "fullPage": true,
+  "format": "png"
+}</code></pre>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Optimization Section -->
+        <section id="optimization" class="mb-12">
+            <div class="bg-white rounded-lg shadow-lg p-8">
+                <h2 class="text-3xl font-bold mb-6 text-gray-800">🚀 Performance Optimization</h2>
+                
+                <div class="grid md:grid-cols-3 gap-6">
+                    <!-- Speed -->
+                    <div class="bg-green-50 border border-green-200 rounded-lg p-6">
+                        <h3 class="text-lg font-semibold mb-3 text-green-800">⚡ Speed Priority</h3>
+                        <ul class="text-sm text-green-700 space-y-2">
+                            <li>• <code>waitStrategy: "domcontentloaded"</code></li>
+                            <li>• <code>maxWaitTime: 1000</code></li>
+                            <li>• <code>blockResources: true</code></li>
+                            <li>• <code>format: "jpeg"</code></li>
+                        </ul>
+                        <p class="text-xs text-green-600 mt-3">Best for: Static websites, landing pages</p>
+                    </div>
+
+                    <!-- Balanced -->
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                        <h3 class="text-lg font-semibold mb-3 text-blue-800">⚖️ Balanced</h3>
+                        <ul class="text-sm text-blue-700 space-y-2">
+                            <li>• <code>waitStrategy: "networkidle2"</code></li>
+                            <li>• <code>maxWaitTime: 5000</code></li>
+                            <li>• <code>blockResources: false</code></li>
+                            <li>• <code>format: "png"</code></li>
+                        </ul>
+                        <p class="text-xs text-blue-600 mt-3">Best for: Most websites, good compromise</p>
+                    </div>
+
+                    <!-- Quality -->
+                    <div class="bg-purple-50 border border-purple-200 rounded-lg p-6">
+                        <h3 class="text-lg font-semibold mb-3 text-purple-800">🎯 Quality Priority</h3>
+                        <ul class="text-sm text-purple-700 space-y-2">
+                            <li>• <code>waitStrategy: "networkidle0"</code></li>
+                            <li>• <code>maxWaitTime: 15000</code></li>
+                            <li>• <code>blockResources: false</code></li>
+                            <li>• <code>fullPage: true</code></li>
+                        </ul>
+                        <p class="text-xs text-purple-600 mt-3">Best for: Complex apps, dynamic content</p>
+                    </div>
+                </div>
+
+                <!-- Wait Strategies -->
+                <div class="mt-8">
+                    <h3 class="text-xl font-semibold mb-4 text-gray-800">Wait Strategies Explained</h3>
+                    <div class="grid md:grid-cols-3 gap-4">
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <h4 class="font-medium mb-2">domcontentloaded</h4>
+                            <p class="text-sm text-gray-600">Fastest - fires when initial HTML is loaded</p>
+                        </div>
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <h4 class="font-medium mb-2">networkidle2</h4>
+                            <p class="text-sm text-gray-600">Balanced - waits until ≤2 network requests</p>
+                        </div>
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <h4 class="font-medium mb-2">networkidle0</h4>
+                            <p class="text-sm text-gray-600">Thorough - waits until 0 network requests</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Error Handling -->
+        <section id="errors" class="mb-12">
+            <div class="bg-white rounded-lg shadow-lg p-8">
+                <h2 class="text-3xl font-bold mb-6 text-gray-800">⚠️ Error Handling</h2>
+                
+                <div class="space-y-6">
+                    <!-- 400 Error -->
+                    <div class="border-l-4 border-red-500 pl-6">
+                        <h3 class="text-lg font-semibold text-red-600 mb-2">400 Bad Request</h3>
+                        <p class="text-gray-600 mb-3">Missing required URL parameter</p>
+                        <div class="bg-red-50 p-4 rounded-lg">
+                            <pre class="text-sm text-red-800"><code>{
+  "error": "URL is required"
+}</code></pre>
+                        </div>
+                    </div>
+
+                    <!-- 500 Error -->
+                    <div class="border-l-4 border-orange-500 pl-6">
+                        <h3 class="text-lg font-semibold text-orange-600 mb-2">500 Internal Server Error</h3>
+                        <p class="text-gray-600 mb-3">Screenshot capture failed</p>
+                        <div class="bg-orange-50 p-4 rounded-lg">
+                            <pre class="text-sm text-orange-800"><code>{
+  "error": "Failed to take screenshot",
+  "message": "Navigation timeout of 30000 ms exceeded"
+}</code></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-white py-8">
+        <div class="container mx-auto px-6 text-center">
+            <p class="mb-4">📸 Screenshot API Documentation</p>
+            <p class="text-gray-400">Built with ❤️ using Express.js and Puppeteer</p>
+        </div>
+    </footer>
+
+    <script>
+        // Smooth scrolling for navigation
+        document.querySelectorAll('nav a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                document.querySelector(this.getAttribute('href')).scrollIntoView({
+                    behavior: 'smooth'
+                });
+            });
+        });
+
+        // Copy code blocks on click
+        document.querySelectorAll('pre code').forEach(block => {
+            block.addEventListener('click', function() {
+                navigator.clipboard.writeText(this.textContent);
+                
+                // Visual feedback
+                const original = this.style.backgroundColor;
+                this.style.backgroundColor = '#10B981';
+                setTimeout(() => {
+                    this.style.backgroundColor = original;
+                }, 200);
+            });
+        });
+    </script>
+</body>
+</html>

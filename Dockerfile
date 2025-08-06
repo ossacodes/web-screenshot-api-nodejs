@@ -16,7 +16,7 @@ WORKDIR /usr/src/app
 # Set environment variables
 ENV NODE_ENV=production
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
-ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome
 
 # Copy package files
 COPY package*.json ./
@@ -26,6 +26,10 @@ RUN npm ci --only=production
 
 # Bundle app source
 COPY . .
+
+# Debug: Check where Chrome is installed
+RUN which google-chrome || which google-chrome-stable || which chromium-browser || echo "Chrome not found in PATH"
+RUN ls -la /usr/bin/google-chrome* || echo "No google-chrome files found"
 
 # Create a user to run the app (security best practice)
 RUN groupadd -r pptruser && useradd -r -g pptruser -G audio,video pptruser \

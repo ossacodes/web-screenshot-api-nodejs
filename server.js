@@ -26,10 +26,34 @@ async function getPuppeteer() {
                      process.env.DOCKER === 'true';
   
   if (isContainer) {
-    // Use system Chrome in containerized environments
+    // Try multiple possible Chrome paths in containerized environments
+    const possiblePaths = [
+      '/usr/bin/google-chrome',
+      '/usr/bin/google-chrome-stable',
+      '/usr/bin/chromium-browser',
+      '/usr/bin/chromium'
+    ];
+    
+    const fs = require('fs');
+    let executablePath = null;
+    
+    for (const path of possiblePaths) {
+      if (fs.existsSync(path)) {
+        executablePath = path;
+        console.log(`Found Chrome at: ${path}`);
+        break;
+      }
+    }
+    
+    if (!executablePath) {
+      console.error('Chrome not found at any expected paths:', possiblePaths);
+      // Fall back to letting Puppeteer find Chrome
+      executablePath = null;
+    }
+    
     return {
       puppeteer: puppeteer,
-      executablePath: '/usr/bin/google-chrome-stable'
+      executablePath: executablePath
     };
   } else {
     // Use bundled Chromium for local development
@@ -185,8 +209,24 @@ app.post('/screenshot', async (req, res) => {
 });
 
 // Health check endpoint
-app.get('/health', (req, res) => {
-  res.json({ status: 'OK', timestamp: new Date().toISOString() });
+app.get('/health', async (req, res) => {
+  try {
+    const { executablePath } = await getPuppeteer();
+    const chromeStatus = executablePath ? `Chrome found at: ${executablePath}` : 'Using bundled Chromium';
+    
+    res.json({ 
+      status: 'OK', 
+      timestamp: new Date().toISOString(),
+      chrome: chromeStatus,
+      environment: process.env.NODE_ENV || 'development'
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'ERROR',
+      timestamp: new Date().toISOString(),
+      error: error.message
+    });
+  }
 });
 
 app.listen(port, () => {

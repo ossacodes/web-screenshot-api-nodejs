@@ -1,5 +1,4 @@
 const express = require('express');
-const puppeteer = require('puppeteer');
 const fs = require('fs');
 const path = require('path');
 const app = express();
@@ -16,6 +15,25 @@ app.use((req, res, next) => {
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   next();
 });
+
+// Dynamic puppeteer import based on environment
+async function getPuppeteer() {
+  try {
+    // Try to use chrome-aws-lambda for production environments
+    const chromium = require('chrome-aws-lambda');
+    return {
+      puppeteer: chromium.puppeteer,
+      executablePath: await chromium.executablePath
+    };
+  } catch (error) {
+    // Fall back to regular puppeteer for local development
+    const puppeteer = require('puppeteer');
+    return {
+      puppeteer: puppeteer,
+      executablePath: null
+    };
+  }
+}
 
 // Screenshot endpoint
 app.post('/screenshot', async (req, res) => {
@@ -38,8 +56,10 @@ app.post('/screenshot', async (req, res) => {
   const startTime = Date.now();
   
   try {
+    const { puppeteer, executablePath } = await getPuppeteer();
+    
     // Launch browser with optimized settings for production
-    browser = await puppeteer.launch({
+    const launchOptions = {
       headless: 'new',
       args: [
         '--no-sandbox', 
@@ -50,9 +70,19 @@ app.post('/screenshot', async (req, res) => {
         '--no-zygote',
         '--disable-gpu',
         '--single-process', // Important for some hosting platforms
-        '--disable-features=VizDisplayCompositor'
+        '--disable-features=VizDisplayCompositor',
+        '--disable-background-timer-throttling',
+        '--disable-backgrounding-occluded-windows',
+        '--disable-renderer-backgrounding'
       ]
-    });
+    };
+
+    // Use custom executable path if available (for chrome-aws-lambda)
+    if (executablePath) {
+      launchOptions.executablePath = executablePath;
+    }
+
+    browser = await puppeteer.launch(launchOptions);
 
     const page = await browser.newPage();
     

@@ -54,26 +54,34 @@ Health check endpoint.
 
 ## Deployment
 
-### Railway (Recommended)
+### Railway (Recommended for easiest setup)
 
 1. Push your code to GitHub
 2. Go to [railway.app](https://railway.app)
 3. Connect your GitHub repository
 4. Deploy automatically
 
+### Digital Ocean App Platform
+
+**Option 1: Using chrome-aws-lambda (Recommended)**
+1. The code includes automatic Chrome installation via `chrome-aws-lambda`
+2. Push your code to GitHub
+3. Create a new App on Digital Ocean App Platform
+4. Connect your GitHub repository
+5. Deploy (Chrome will be installed automatically)
+
+**Option 2: Using Docker**
+1. Make sure the Dockerfile is in your repository
+2. Create a new App on Digital Ocean App Platform
+3. Choose "Docker" as the source type
+4. Connect your GitHub repository
+5. Deploy
+
 ### Render
 
 1. Push your code to GitHub
 2. Go to [render.com](https://render.com)
 3. Create a new Web Service
-4. Connect your GitHub repository
-5. Deploy
-
-### Digital Ocean App Platform
-
-1. Push your code to GitHub
-2. Go to Digital Ocean App Platform
-3. Create a new App
 4. Connect your GitHub repository
 5. Deploy
 

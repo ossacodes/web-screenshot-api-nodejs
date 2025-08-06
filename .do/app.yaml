@@ -1,22 +1,21 @@
 name: screenshot-api
 services:
-- name: web
+- name: api
   source_dir: /
   github:
     repo: ossacodes/web-screenshot-api-nodejs
     branch: main
+    deploy_on_push: true
   run_command: npm start
   build_command: npm install
   environment_slug: node-js
   instance_count: 1
-  instance_size_slug: basic-s  # At least basic-s for Puppeteer
-  http_port: 8080
+  instance_size_slug: basic-xxs
+  http_port: 3000
   routes:
   - path: /
   envs:
   - key: NODE_ENV
     value: production
-  - key: PUPPETEER_SKIP_CHROMIUM_DOWNLOAD
-    value: "true"
-  - key: PUPPETEER_EXECUTABLE_PATH
-    value: "/app/.apt/usr/bin/google-chrome"
+  - key: PUPPETEER_ARGS
+    value: "--no-sandbox,--disable-setuid-sandbox,--disable-dev-shm-usage"

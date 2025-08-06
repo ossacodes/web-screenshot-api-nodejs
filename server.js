@@ -3,9 +3,23 @@ const puppeteer = require('puppeteer');
 const fs = require('fs');
 const path = require('path');
 const app = express();
-const port = 3000;
+const port = process.env.PORT || 3000;
 
 app.use(express.json());
+
+// Root endpoint
+app.get('/', (req, res) => {
+  res.json({
+    name: 'Screenshot API',
+    version: '1.0.0',
+    description: 'Take website screenshots programmatically',
+    endpoints: {
+      'POST /screenshot': 'Take a screenshot of a website',
+      'GET /health': 'Health check endpoint'
+    },
+    documentation: 'https://github.com/ossacodes/web-screenshot-api-nodejs'
+  });
+});
 
 // Screenshot endpoint
 app.post('/screenshot', async (req, res) => {
@@ -28,7 +42,7 @@ app.post('/screenshot', async (req, res) => {
   const startTime = Date.now();
   
   try {
-    // Launch browser with optimized settings
+    // Launch browser with optimized settings for cloud deployment
     browser = await puppeteer.launch({
       headless: 'new',
       args: [
@@ -38,8 +52,15 @@ app.post('/screenshot', async (req, res) => {
         '--disable-accelerated-2d-canvas',
         '--no-first-run',
         '--no-zygote',
-        '--disable-gpu'
-      ]
+        '--disable-gpu',
+        '--disable-web-security',
+        '--disable-features=VizDisplayCompositor',
+        '--single-process' // Important for DigitalOcean
+      ],
+      // Use system Chrome in Docker/cloud environments
+      executablePath: process.env.NODE_ENV === 'production' 
+        ? process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium-browser'
+        : undefined
     });
 
     const page = await browser.newPage();
@@ -151,11 +172,13 @@ app.get('/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
-app.listen(port, () => {
-  console.log(`Screenshot API running on http://localhost:${port}`);
+app.listen(port, '0.0.0.0', () => {
+  console.log(`Screenshot API running on port ${port}`);
+  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log('Endpoints:');
+  console.log('  GET  / - API information');
   console.log('  POST /screenshot - Take a screenshot');
-  console.log('  GET /health - Health check');
+  console.log('  GET  /health - Health check');
 });
 
 // Graceful shutdown

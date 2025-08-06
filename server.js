@@ -1,140 +1,48 @@
 const express = require('express');
-const { getBrowser, closeBrowser } = require('./browser-config');
+const puppeteer = require('puppeteer');
+const fs = require('fs');
+const path = require('path');
 const app = express();
+const port = 3000;
 
-// Use PORT environment variable for deployment platforms
-const port = process.env.PORT || 8080;
-
-app.use(express.json({ limit: '10mb' }));
-
-// Add CORS headers for RapidAPI
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  next();
-});
-
-// Health check endpoint (required for App Platform)
-app.get('/health', async (req, res) => {
-  try {
-    // Test browser availability
-    const browser = await getBrowser();
-    const version = await browser.version();
-    
-    res.json({ 
-      status: 'healthy',
-      timestamp: new Date().toISOString(),
-      environment: process.env.NODE_ENV || 'development',
-      workingDirectory: process.cwd(),
-      nodeVersion: process.version,
-      puppeteerVersion: version,
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || 'auto-detect'
-    });
-  } catch (error) {
-    console.error('Health check failed:', error);
-    res.status(500).json({
-      status: 'unhealthy',
-      timestamp: new Date().toISOString(),
-      error: error.message
-    });
-  }
-});
-
-// Debug endpoint to help diagnose Chrome installation
-app.get('/debug', (req, res) => {
-  const fs = require('fs');
-  const { execSync } = require('child_process');
-  
-  const debugInfo = {
-    environment: {
-      NODE_ENV: process.env.NODE_ENV,
-      PUPPETEER_EXECUTABLE_PATH: process.env.PUPPETEER_EXECUTABLE_PATH,
-      PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: process.env.PUPPETEER_SKIP_CHROMIUM_DOWNLOAD,
-      PWD: process.cwd(),
-      PATH: process.env.PATH
-    },
-    chromeLocations: {}
-  };
-  
-  // Check common Chrome locations
-  const possiblePaths = [
-    '/app/.apt/usr/bin/google-chrome',
-    '/usr/bin/google-chrome-stable',
-    '/usr/bin/google-chrome',
-    '/usr/bin/chromium-browser',
-    '/usr/bin/chromium',
-    '/opt/google/chrome/chrome'
-  ];
-  
-  possiblePaths.forEach(path => {
-    try {
-      const exists = fs.existsSync(path);
-      debugInfo.chromeLocations[path] = {
-        exists,
-        executable: exists ? fs.accessSync(path, fs.constants.X_OK) === undefined : false
-      };
-    } catch (error) {
-      debugInfo.chromeLocations[path] = { exists: false, error: error.message };
-    }
-  });
-  
-  // Try to find Chrome with which command
-  try {
-    const whichChrome = execSync('which google-chrome || which chromium || echo "not found"', { encoding: 'utf8' }).trim();
-    debugInfo.whichChrome = whichChrome;
-  } catch (error) {
-    debugInfo.whichChrome = 'command failed';
-  }
-  
-  // List /app/.apt/usr/bin/ if it exists
-  try {
-    if (fs.existsSync('/app/.apt/usr/bin/')) {
-      debugInfo.buildpackBinaries = fs.readdirSync('/app/.apt/usr/bin/').filter(f => f.includes('chrome') || f.includes('chromium'));
-    }
-  } catch (error) {
-    debugInfo.buildpackBinaries = 'directory not accessible';
-  }
-  
-  res.json(debugInfo);
-});
+app.use(express.json());
 
 // Screenshot endpoint
 app.post('/screenshot', async (req, res) => {
   const { 
     url, 
-    width = 1280, 
-    height = 720, 
+    width = 1920, 
+    height = 1080, 
     fullPage = false, 
     format = 'png',
-    waitStrategy = 'networkidle2',
-    maxWaitTime = 5000,
-    blockResources = false,
-    deviceScaleFactor = 1,
-    quality = 80
+    waitStrategy = 'networkidle2', // faster default
+    maxWaitTime = 10000, // configurable wait time
+    blockResources = false // option to block ads/analytics
   } = req.body;
   
   if (!url) {
     return res.status(400).json({ error: 'URL is required' });
   }
 
-  // Validate URL
-  try {
-    new URL(url);
-  } catch {
-    return res.status(400).json({ error: 'Invalid URL format' });
-  }
-
-  let page;
+  let browser;
   const startTime = Date.now();
   
   try {
-    const browser = await getBrowser();
-    page = await browser.newPage();
-    
-    // Configure page with timeouts
-    page.setDefaultTimeout(30000);
-    page.setDefaultNavigationTimeout(30000);
+    // Launch browser with optimized settings
+    browser = await puppeteer.launch({
+      headless: 'new',
+      args: [
+        '--no-sandbox', 
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage', // overcome limited resource problems
+        '--disable-accelerated-2d-canvas',
+        '--no-first-run',
+        '--no-zygote',
+        '--disable-gpu'
+      ]
+    });
+
+    const page = await browser.newPage();
     
     // Optional: Block unnecessary resources for faster loading
     if (blockResources) {
@@ -150,24 +58,20 @@ app.post('/screenshot', async (req, res) => {
     }
     
     // Set viewport
-    await page.setViewport({ 
-      width: Math.min(width, 1920), 
-      height: Math.min(height, 1080),
-      deviceScaleFactor: Math.min(deviceScaleFactor, 2)
-    });
+    await page.setViewport({ width, height });
     
-    // Navigate to URL
+    // Navigate to URL with configurable wait strategy
     await page.goto(url, { 
       waitUntil: waitStrategy,
       timeout: 30000 
     });
 
-    // Wait for additional content
+    // Configurable wait time instead of fixed 2 seconds
     if (maxWaitTime > 0) {
       await new Promise(resolve => setTimeout(resolve, Math.min(maxWaitTime, 10000)));
     }
 
-    // Wait for images to load if not blocking resources
+    // Only wait for images if not blocking resources
     if (!blockResources) {
       try {
         await Promise.race([
@@ -175,20 +79,20 @@ app.post('/screenshot', async (req, res) => {
             const selectors = Array.from(document.querySelectorAll("img"));
             await Promise.all(selectors.map(img => {
               if (img.complete) return Promise.resolve();
-              return new Promise((resolve) => {
-                const timeout = setTimeout(() => resolve(), 3000);
+              return new Promise((resolve, reject) => {
+                const timeout = setTimeout(() => resolve(), 5000); // 5s max per image
                 img.addEventListener('load', () => {
                   clearTimeout(timeout);
                   resolve();
                 });
                 img.addEventListener('error', () => {
                   clearTimeout(timeout);
-                  resolve();
+                  resolve(); // Don't fail on broken images
                 });
               });
             }));
           }),
-          new Promise(resolve => setTimeout(resolve, 5000))
+          new Promise(resolve => setTimeout(resolve, 8000)) // Max 8s total for all images
         ]);
       } catch (error) {
         console.warn('Image loading timeout, proceeding with screenshot');
@@ -196,28 +100,38 @@ app.post('/screenshot', async (req, res) => {
     }
 
     // Take screenshot
-    const screenshotOptions = {
+    const screenshot = await page.screenshot({
       type: format,
-      fullPage: fullPage
-    };
-    
-    if (format === 'jpeg') {
-      screenshotOptions.quality = Math.min(Math.max(quality, 1), 100);
-    }
+      fullPage: fullPage,
+      encoding: 'base64'
+    });
 
-    const screenshot = await page.screenshot(screenshotOptions);
+    // Generate filename with timestamp
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const filename = `screenshot-${timestamp}.${format}`;
+    const filepath = path.join(__dirname, filename);
+
+    // Save screenshot to file
+    const buffer = Buffer.from(screenshot, 'base64');
+    fs.writeFileSync(filepath, buffer);
 
     const totalTime = Date.now() - startTime;
 
-    // Return binary data for better performance
-    res.set({
-      'Content-Type': `image/${format}`,
-      'Content-Length': screenshot.length,
-      'Cache-Control': 'no-cache',
-      'X-Processing-Time': `${totalTime}ms`
+    res.json({
+      success: true,
+      screenshot: `data:image/${format};base64,${screenshot}`,
+      url: url,
+      dimensions: { width, height },
+      fullPage: fullPage,
+      savedAs: filename,
+      filepath: filepath,
+      processingTime: `${totalTime}ms`,
+      settings: {
+        waitStrategy,
+        maxWaitTime,
+        blockResources
+      }
     });
-
-    res.send(screenshot);
 
   } catch (error) {
     console.error('Screenshot error:', error);
@@ -226,69 +140,26 @@ app.post('/screenshot', async (req, res) => {
       message: error.message 
     });
   } finally {
-    if (page) {
-      try {
-        await page.close();
-      } catch (err) {
-        console.warn('Error closing page:', err);
-      }
+    if (browser) {
+      await browser.close();
     }
   }
 });
 
 // Health check endpoint
-app.get('/health', async (req, res) => {
-  try {
-    // Test browser availability
-    const browser = await getBrowser();
-    const version = await browser.version();
-    
-    res.json({ 
-      status: 'healthy',
-      timestamp: new Date().toISOString(),
-      environment: process.env.NODE_ENV || 'development',
-      workingDirectory: process.cwd(),
-      nodeVersion: process.version,
-      puppeteerVersion: version,
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || 'bundled'
-    });
-  } catch (error) {
-    console.error('Health check failed:', error);
-    res.status(500).json({
-      status: 'unhealthy',
-      timestamp: new Date().toISOString(),
-      error: error.message
-    });
-  }
+app.get('/health', (req, res) => {
+  res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
-app.listen(port, '0.0.0.0', () => {
-  console.log(`Screenshot API running on port ${port}`);
+app.listen(port, () => {
+  console.log(`Screenshot API running on http://localhost:${port}`);
   console.log('Endpoints:');
   console.log('  POST /screenshot - Take a screenshot');
   console.log('  GET /health - Health check');
-  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
 });
 
-// Graceful shutdown for App Platform
-process.on('SIGTERM', async () => {
-  console.log('Received SIGTERM, shutting down gracefully...');
-  try {
-    await closeBrowser();
-    console.log('Browser closed successfully');
-  } catch (error) {
-    console.error('Error during shutdown:', error);
-  }
-  process.exit(0);
-});
-
-process.on('SIGINT', async () => {
-  console.log('Received SIGINT, shutting down gracefully...');
-  try {
-    await closeBrowser();
-    console.log('Browser closed successfully');
-  } catch (error) {
-    console.error('Error during shutdown:', error);
-  }
+// Graceful shutdown
+process.on('SIGINT', () => {
+  console.log('Shutting down gracefully...');
   process.exit(0);
 });

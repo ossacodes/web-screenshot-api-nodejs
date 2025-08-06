@@ -7,13 +7,15 @@ services:
     branch: main
     deploy_on_push: true
   run_command: npm start
-  build_command: ./build.sh
+  build_command: npm ci --only=production
   environment_slug: node-js
   instance_count: 1
-  instance_size_slug: basic-xxs
+  instance_size_slug: professional-xs
   http_port: 3000
   routes:
   - path: /
   envs:
   - key: NODE_ENV
     value: production
+  - key: AWS_LAMBDA_FUNCTION_MEMORY_SIZE
+    value: "512"

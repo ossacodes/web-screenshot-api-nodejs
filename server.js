@@ -29,7 +29,7 @@ app.get('/health', async (req, res) => {
       workingDirectory: process.cwd(),
       nodeVersion: process.version,
       puppeteerVersion: version,
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || 'bundled'
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || 'auto-detect'
     });
   } catch (error) {
     console.error('Health check failed:', error);
@@ -39,6 +39,64 @@ app.get('/health', async (req, res) => {
       error: error.message
     });
   }
+});
+
+// Debug endpoint to help diagnose Chrome installation
+app.get('/debug', (req, res) => {
+  const fs = require('fs');
+  const { execSync } = require('child_process');
+  
+  const debugInfo = {
+    environment: {
+      NODE_ENV: process.env.NODE_ENV,
+      PUPPETEER_EXECUTABLE_PATH: process.env.PUPPETEER_EXECUTABLE_PATH,
+      PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: process.env.PUPPETEER_SKIP_CHROMIUM_DOWNLOAD,
+      PWD: process.cwd(),
+      PATH: process.env.PATH
+    },
+    chromeLocations: {}
+  };
+  
+  // Check common Chrome locations
+  const possiblePaths = [
+    '/app/.apt/usr/bin/google-chrome',
+    '/usr/bin/google-chrome-stable',
+    '/usr/bin/google-chrome',
+    '/usr/bin/chromium-browser',
+    '/usr/bin/chromium',
+    '/opt/google/chrome/chrome'
+  ];
+  
+  possiblePaths.forEach(path => {
+    try {
+      const exists = fs.existsSync(path);
+      debugInfo.chromeLocations[path] = {
+        exists,
+        executable: exists ? fs.accessSync(path, fs.constants.X_OK) === undefined : false
+      };
+    } catch (error) {
+      debugInfo.chromeLocations[path] = { exists: false, error: error.message };
+    }
+  });
+  
+  // Try to find Chrome with which command
+  try {
+    const whichChrome = execSync('which google-chrome || which chromium || echo "not found"', { encoding: 'utf8' }).trim();
+    debugInfo.whichChrome = whichChrome;
+  } catch (error) {
+    debugInfo.whichChrome = 'command failed';
+  }
+  
+  // List /app/.apt/usr/bin/ if it exists
+  try {
+    if (fs.existsSync('/app/.apt/usr/bin/')) {
+      debugInfo.buildpackBinaries = fs.readdirSync('/app/.apt/usr/bin/').filter(f => f.includes('chrome') || f.includes('chromium'));
+    }
+  } catch (error) {
+    debugInfo.buildpackBinaries = 'directory not accessible';
+  }
+  
+  res.json(debugInfo);
 });
 
 // Screenshot endpoint

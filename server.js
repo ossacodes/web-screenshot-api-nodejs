@@ -18,15 +18,28 @@ app.use((req, res, next) => {
 
 // Dynamic puppeteer import based on environment
 async function getPuppeteer() {
+  // Check if we're in a cloud environment (like DigitalOcean)
+  const isCloudEnvironment = process.env.NODE_ENV === 'production' || 
+                            process.env.CONTAINER === 'true' ||
+                            process.env.DOCKER === 'true' ||
+                            process.cwd().includes('/workspace'); // DigitalOcean App Platform
+  
+  if (isCloudEnvironment && !process.env.DOCKER) {
+    // Use chrome-aws-lambda for cloud platforms without Docker
+    console.log('Using chrome-aws-lambda for cloud deployment');
+    const chromium = require('chrome-aws-lambda');
+    
+    return {
+      puppeteer: chromium.puppeteer,
+      executablePath: await chromium.executablePath,
+      args: chromium.args
+    };
+  }
+  
+  // For Docker or local development, use regular puppeteer
   const puppeteer = require('puppeteer');
   
-  // Check if we're in a containerized environment (like DigitalOcean)
-  const isContainer = process.env.NODE_ENV === 'production' || 
-                     process.env.CONTAINER === 'true' ||
-                     process.env.DOCKER === 'true' ||
-                     process.cwd().includes('/workspace'); // DigitalOcean App Platform
-  
-  if (isContainer) {
+  if (isCloudEnvironment) {
     // Try multiple possible Chrome paths in containerized environments
     const possiblePaths = [
       '/usr/bin/google-chrome',
@@ -101,13 +114,15 @@ async function getPuppeteer() {
     
     return {
       puppeteer: puppeteer,
-      executablePath: executablePath
+      executablePath: executablePath,
+      args: []
     };
   } else {
     // Use bundled Chromium for local development
     return {
       puppeteer: puppeteer,
-      executablePath: null
+      executablePath: null,
+      args: []
     };
   }
 }
@@ -133,12 +148,13 @@ app.post('/screenshot', async (req, res) => {
   const startTime = Date.now();
   
   try {
-    const { puppeteer, executablePath } = await getPuppeteer();
+    const { puppeteer, executablePath, args } = await getPuppeteer();
     
     // Launch browser with optimized settings for production
     const launchOptions = {
       headless: 'new',
       args: [
+        ...args, // Include chrome-aws-lambda args if available
         '--no-sandbox', 
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage', // overcome limited resource problems
@@ -151,7 +167,6 @@ app.post('/screenshot', async (req, res) => {
         '--disable-backgrounding-occluded-windows',
         '--disable-renderer-backgrounding',
         '--disable-web-security',
-        '--disable-features=VizDisplayCompositor',
         '--window-size=1920,1080'
       ]
     };
@@ -263,7 +278,7 @@ app.post('/screenshot', async (req, res) => {
 app.get('/health', async (req, res) => {
   try {
     const { executablePath } = await getPuppeteer();
-    const chromeStatus = executablePath ? `Chrome found at: ${executablePath}` : 'Using bundled Chromium or letting Puppeteer find Chrome';
+    const chromeStatus = executablePath ? `Chrome found at: ${executablePath}` : 'Using bundled Chromium or chrome-aws-lambda';
     
     res.json({ 
       status: 'OK', 

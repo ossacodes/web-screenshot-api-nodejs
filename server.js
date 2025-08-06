@@ -23,7 +23,8 @@ async function getPuppeteer() {
   // Check if we're in a containerized environment (like DigitalOcean)
   const isContainer = process.env.NODE_ENV === 'production' || 
                      process.env.CONTAINER === 'true' ||
-                     process.env.DOCKER === 'true';
+                     process.env.DOCKER === 'true' ||
+                     process.cwd().includes('/workspace'); // DigitalOcean App Platform
   
   if (isContainer) {
     // Try multiple possible Chrome paths in containerized environments
@@ -59,21 +60,39 @@ async function getPuppeteer() {
       console.error('Chrome not found at any expected paths:', possiblePaths);
       console.log('Attempting to let Puppeteer find Chrome automatically...');
       
-      // Check if we can install Chrome via Puppeteer as last resort
+      // Try to install Chrome via Puppeteer as last resort
       try {
-        console.log('Checking Puppeteer cache directory...');
-        const cachePath = process.env.PUPPETEER_CACHE_DIR || '/usr/src/app/.cache/puppeteer';
-        console.log(`Cache path: ${cachePath}`);
+        console.log('Attempting to install Chrome via Puppeteer...');
+        const { execSync } = require('child_process');
         
-        // List cache contents
+        // Install Chrome using Puppeteer
+        execSync('npx puppeteer browsers install chrome', { 
+          stdio: 'pipe',
+          timeout: 120000 // 2 minutes timeout
+        });
+        
+        console.log('Chrome installation completed via Puppeteer');
+        
+        // Check the cache again after installation
+        const cachePath = process.env.PUPPETEER_CACHE_DIR || process.env.HOME + '/.cache/puppeteer' || '/workspace/.cache/puppeteer';
+        console.log(`Checking cache path: ${cachePath}`);
+        
         if (fs.existsSync(cachePath)) {
-          const cacheContents = fs.readdirSync(cachePath);
-          console.log('Cache contents:', cacheContents);
-        } else {
-          console.log('Cache directory does not exist');
+          const cacheContents = fs.readdirSync(cachePath, { recursive: true });
+          console.log('Cache contents after installation:', cacheContents);
+          
+          // Look for Chrome executable in the cache
+          const chromeExecutables = cacheContents.filter(file => 
+            typeof file === 'string' && (file.includes('chrome') || file.includes('Chrome'))
+          );
+          
+          if (chromeExecutables.length > 0) {
+            console.log('Found Chrome executables in cache:', chromeExecutables);
+          }
         }
-      } catch (err) {
-        console.log('Error checking cache:', err.message);
+        
+      } catch (installError) {
+        console.log('Failed to install Chrome via Puppeteer:', installError.message);
       }
       
       // Don't set executablePath, let Puppeteer try to find it

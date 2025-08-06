@@ -6,8 +6,8 @@ README.md
 .env
 .nyc_output
 coverage
-.DS_Store
+.coverage
 *.png
 *.jpg
 *.jpeg
-.do
+.DS_Store

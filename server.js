@@ -1,13 +1,25 @@
 const express = require('express');
+const puppeteer = require('puppeteer');
 const fs = require('fs');
 const path = require('path');
-
 const app = express();
 const port = process.env.PORT || 3000;
 
 app.use(express.json());
 
-// Root endpoint
+// Add CORS headers for API usage
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(200);
+  } else {
+    next();
+  }
+});
+
+// Root endpoint for API info
 app.get('/', (req, res) => {
   res.json({
     name: 'Screenshot API',
@@ -30,7 +42,7 @@ app.post('/screenshot', async (req, res) => {
     fullPage = false, 
     format = 'png',
     waitStrategy = 'networkidle2', // faster default
-    maxWaitTime = 10000, // configurable wait time
+    maxWaitTime = 5000, // reduced for better performance on Render
     blockResources = false // option to block ads/analytics
   } = req.body;
   
@@ -38,53 +50,42 @@ app.post('/screenshot', async (req, res) => {
     return res.status(400).json({ error: 'URL is required' });
   }
 
+  // Validate URL format
+  try {
+    new URL(url);
+  } catch (error) {
+    return res.status(400).json({ error: 'Invalid URL format' });
+  }
+
+  // Validate dimensions
+  if (width < 100 || width > 3840 || height < 100 || height > 2160) {
+    return res.status(400).json({ 
+      error: 'Invalid dimensions. Width and height must be between 100-3840 and 100-2160 respectively' 
+    });
+  }
+
   let browser;
   const startTime = Date.now();
   
   try {
-    // Force chrome-aws-lambda in production environments
-    if (process.env.NODE_ENV === 'production') {
-      console.log('Production environment detected - using chrome-aws-lambda');
-      const chromium = require('chrome-aws-lambda');
-      
-      browser = await chromium.puppeteer.launch({
-        args: [
-          ...chromium.args,
-          '--no-sandbox',
-          '--disable-setuid-sandbox', 
-          '--disable-dev-shm-usage',
-          '--disable-gpu',
-          '--single-process',
-          '--no-zygote'
-        ],
-        defaultViewport: chromium.defaultViewport,
-        executablePath: await chromium.executablePath,
-        headless: chromium.headless,
-      });
-    } else {
-      // Use puppeteer for local development (fallback to puppeteer-core)
-      console.log('Development environment - using puppeteer');
-      let puppeteer;
-      try {
-        puppeteer = require('puppeteer');
-      } catch (e) {
-        puppeteer = require('puppeteer-core');
-        console.log('Using puppeteer-core as fallback');
-      }
-      
-      browser = await puppeteer.launch({
-        headless: 'new',
-        args: [
-          '--no-sandbox', 
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-accelerated-2d-canvas',
-          '--no-first-run',
-          '--no-zygote',
-          '--disable-gpu'
-        ]
-      });
-    }
+    // Launch browser with optimized settings for Render.com
+    browser = await puppeteer.launch({
+      headless: 'new',
+      args: [
+        '--no-sandbox', 
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage', // overcome limited resource problems
+        '--disable-accelerated-2d-canvas',
+        '--no-first-run',
+        '--no-zygote',
+        '--disable-gpu',
+        '--single-process', // Important for Render.com
+        '--no-sandbox',
+        '--disable-web-security',
+        '--disable-features=VizDisplayCompositor'
+      ],
+      executablePath: puppeteer.executablePath()
+    });
 
     const page = await browser.newPage();
     
@@ -107,12 +108,12 @@ app.post('/screenshot', async (req, res) => {
     // Navigate to URL with configurable wait strategy
     await page.goto(url, { 
       waitUntil: waitStrategy,
-      timeout: 30000 
+      timeout: 20000 // reduced timeout for Render
     });
 
     // Configurable wait time instead of fixed 2 seconds
     if (maxWaitTime > 0) {
-      await new Promise(resolve => setTimeout(resolve, Math.min(maxWaitTime, 10000)));
+      await new Promise(resolve => setTimeout(resolve, Math.min(maxWaitTime, 5000))); // max 5s on Render
     }
 
     // Only wait for images if not blocking resources
@@ -197,11 +198,9 @@ app.get('/health', (req, res) => {
 
 app.listen(port, '0.0.0.0', () => {
   console.log(`Screenshot API running on port ${port}`);
-  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log('Endpoints:');
-  console.log('  GET  / - API information');
   console.log('  POST /screenshot - Take a screenshot');
-  console.log('  GET  /health - Health check');
+  console.log('  GET /health - Health check');
 });
 
 // Graceful shutdown

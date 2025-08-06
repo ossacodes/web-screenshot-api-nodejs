@@ -1,6 +1,6 @@
 # Screenshot API
 
-A production-ready screenshot API built with Node.js, Express, and Puppeteer, optimized for deployment on RapidAPI.
+A production-ready screenshot API built with Node.js, Express, and Puppeteer, optimized for deployment on cloud platforms like Render.com.
 
 ## Features
 
@@ -10,6 +10,23 @@ A production-ready screenshot API built with Node.js, Express, and Puppeteer, op
 - Base64 encoded response
 - Resource blocking for faster performance
 - Optimized for cloud deployment
+- CORS enabled for API usage
+- Request validation and error handling
+
+## Quick Deploy to Render.com
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy)
+
+1. Click the deploy button above, or:
+2. Fork this repository
+3. Go to [render.com](https://render.com) and create a new Web Service
+4. Connect your GitHub repository
+5. Use these settings:
+   - **Build Command**: `npm install`
+   - **Start Command**: `npm start`
+   - **Environment**: Node.js
+
+See [RENDER_DEPLOYMENT.md](./RENDER_DEPLOYMENT.md) for detailed instructions.
 
 ## API Endpoints
 
@@ -26,10 +43,20 @@ Takes a screenshot of the specified URL.
   "fullPage": false,
   "format": "png",
   "waitStrategy": "networkidle2",
-  "maxWaitTime": 10000,
+  "maxWaitTime": 5000,
   "blockResources": false
 }
 ```
+
+**Parameters:**
+- `url` (required): Website URL to screenshot
+- `width` (optional): Viewport width (100-3840, default: 1920)
+- `height` (optional): Viewport height (100-2160, default: 1080)
+- `fullPage` (optional): Capture full page (default: false)
+- `format` (optional): Image format - 'png' or 'jpeg' (default: 'png')
+- `waitStrategy` (optional): Loading strategy (default: 'networkidle2')
+- `maxWaitTime` (optional): Max wait time in ms (default: 5000)
+- `blockResources` (optional): Block CSS/images for faster loading (default: false)
 
 **Response:**
 ```json
@@ -42,7 +69,7 @@ Takes a screenshot of the specified URL.
   "processingTime": "2500ms",
   "settings": {
     "waitStrategy": "networkidle2",
-    "maxWaitTime": 10000,
+    "maxWaitTime": 5000,
     "blockResources": false
   }
 }
@@ -52,7 +79,24 @@ Takes a screenshot of the specified URL.
 
 Health check endpoint.
 
+**Response:**
+```json
+{
+  "status": "OK",
+  "timestamp": "2025-08-06T18:58:33.561Z"
+}
+```
+
 ## Deployment
+
+### Render.com (Recommended)
+
+See [RENDER_DEPLOYMENT.md](./RENDER_DEPLOYMENT.md) for complete deployment instructions.
+
+**Quick Steps:**
+1. Push code to GitHub
+2. Connect repository to Render.com
+3. Deploy with default Node.js settings
 
 ### Railway (Recommended for easiest setup)
 

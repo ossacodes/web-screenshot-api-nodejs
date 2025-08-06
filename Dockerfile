@@ -1,47 +1,65 @@
-# Use Node.js 18 LTS Alpine image
-FROM node:18-alpine
+# Use the official Node.js runtime as the base image
+FROM node:18-slim
 
-# Install necessary packages for Puppeteer
-RUN apk add --no-cache \
-    chromium \
-    nss \
-    freetype \
-    harfbuzz \
+# Install dependencies for Chrome
+RUN apt-get update && apt-get install -y \
     ca-certificates \
-    ttf-freefont \
-    udev \
-    ttf-dejavu
+    fonts-liberation \
+    libappindicator3-1 \
+    libasound2 \
+    libatk-bridge2.0-0 \
+    libatk1.0-0 \
+    libc6 \
+    libcairo2 \
+    libcups2 \
+    libdbus-1-3 \
+    libexpat1 \
+    libfontconfig1 \
+    libgbm1 \
+    libgcc1 \
+    libglib2.0-0 \
+    libgtk-3-0 \
+    libnspr4 \
+    libnss3 \
+    libpango-1.0-0 \
+    libpangocairo-1.0-0 \
+    libstdc++6 \
+    libx11-6 \
+    libx11-xcb1 \
+    libxcb1 \
+    libxcomposite1 \
+    libxcursor1 \
+    libxdamage1 \
+    libxext6 \
+    libxfixes3 \
+    libxi6 \
+    libxrandr2 \
+    libxrender1 \
+    libxss1 \
+    libxtst6 \
+    lsb-release \
+    wget \
+    xdg-utils \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
-# Tell Puppeteer to use the installed Chromium
-ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=false \
-    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+# Set working directory
+WORKDIR /usr/src/app
 
-# Create app directory
-WORKDIR /app
-
-# Copy package files
+# Copy package.json and package-lock.json
 COPY package*.json ./
 
-# Install dependencies (this will download Chromium as backup)
-RUN npm ci --only=production && npm cache clean --force
+# Install dependencies
+RUN npm ci --only=production
 
-# Copy app source
+# Copy application code
 COPY . .
 
-# Create user for security (fix the username)
-RUN addgroup -g 1001 -S nodejs
-RUN adduser -S nodejs -u 1001
+# Create screenshots directory
+RUN mkdir -p screenshots
 
-# Change ownership of the app directory
-RUN chown -R nodejs:nodejs /app
-USER nodejs
-
-# Expose port
+# Expose the port the app runs on
 EXPOSE 3000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD node -e "require('http').get('http://localhost:3000/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"
-
-# Start the application
+# Define the command to run the application
 CMD ["npm", "start"]

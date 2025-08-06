@@ -1,7 +1,35 @@
 const express = require('express');
-const puppeteer = require('puppeteer');
 const fs = require('fs');
 const path = require('path');
+
+// Smart Chrome/Puppeteer detection for different environments
+let puppeteer, chromium;
+
+async function initializeBrowser() {
+  try {
+    // Try chrome-aws-lambda first (best for cloud environments)
+    chromium = require('chrome-aws-lambda');
+    console.log('Using chrome-aws-lambda for cloud deployment');
+    return chromium;
+  } catch (e) {
+    try {
+      // Fall back to regular puppeteer
+      puppeteer = require('puppeteer');
+      console.log('Using regular puppeteer');
+      return puppeteer;
+    } catch (e2) {
+      try {
+        // Last resort: puppeteer-core
+        puppeteer = require('puppeteer-core');
+        console.log('Using puppeteer-core');
+        return puppeteer;
+      } catch (e3) {
+        throw new Error('No suitable browser launcher found. Please install puppeteer or chrome-aws-lambda.');
+      }
+    }
+  }
+}
+
 const app = express();
 const port = process.env.PORT || 3000;
 
@@ -42,37 +70,47 @@ app.post('/screenshot', async (req, res) => {
   const startTime = Date.now();
   
   try {
-    // Launch browser with optimized settings for cloud deployment
-    const browserArgs = [
-      '--no-sandbox', 
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage', // overcome limited resource problems
-      '--disable-accelerated-2d-canvas',
-      '--no-first-run',
-      '--no-zygote',
-      '--disable-gpu',
-      '--disable-web-security',
-      '--disable-features=VizDisplayCompositor'
-    ];
+    // Initialize browser launcher
+    const launcher = await initializeBrowser();
+    
+    // Launch browser based on available launcher
+    if (launcher === chromium) {
+      // Use chrome-aws-lambda
+      browser = await chromium.puppeteer.launch({
+        args: [
+          ...chromium.args,
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--single-process'
+        ],
+        defaultViewport: chromium.defaultViewport,
+        executablePath: await chromium.executablePath,
+        headless: chromium.headless,
+      });
+    } else {
+      // Use regular puppeteer or puppeteer-core
+      const browserArgs = [
+        '--no-sandbox', 
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--no-first-run',
+        '--no-zygote',
+        '--disable-gpu',
+        '--disable-web-security',
+        '--disable-features=VizDisplayCompositor'
+      ];
 
-    // Add single-process for limited memory environments
-    if (process.env.NODE_ENV === 'production') {
-      browserArgs.push('--single-process');
+      if (process.env.NODE_ENV === 'production') {
+        browserArgs.push('--single-process');
+      }
+
+      browser = await launcher.launch({
+        headless: 'new',
+        args: browserArgs
+      });
     }
-
-    const launchOptions = {
-      headless: 'new',
-      args: browserArgs
-    };
-
-    // For DigitalOcean App Platform and similar environments,
-    // let Puppeteer use its bundled Chromium instead of trying to find system Chrome
-    // Only set executablePath if explicitly provided via environment variable
-    if (process.env.PUPPETEER_EXECUTABLE_PATH && process.env.PUPPETEER_EXECUTABLE_PATH !== '/usr/bin/chromium') {
-      launchOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
-    }
-
-    browser = await puppeteer.launch(launchOptions);
 
     const page = await browser.newPage();
     

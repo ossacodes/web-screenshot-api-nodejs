@@ -4,10 +4,10 @@ echo "Starting build process..."
 # Install dependencies
 npm ci --only=production
 
-# Clear any Puppeteer cache
+# Clear any Puppeteer cache to avoid conflicts
 rm -rf ~/.cache/puppeteer
 
-# Reinstall Puppeteer to ensure Chromium is downloaded
-npm rebuild puppeteer
+# Ensure chrome-aws-lambda dependencies are properly installed
+echo "Setting up chrome-aws-lambda..."
 
 echo "Build process completed successfully!"

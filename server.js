@@ -58,6 +58,24 @@ async function getPuppeteer() {
     if (!executablePath) {
       console.error('Chrome not found at any expected paths:', possiblePaths);
       console.log('Attempting to let Puppeteer find Chrome automatically...');
+      
+      // Check if we can install Chrome via Puppeteer as last resort
+      try {
+        console.log('Checking Puppeteer cache directory...');
+        const cachePath = process.env.PUPPETEER_CACHE_DIR || '/usr/src/app/.cache/puppeteer';
+        console.log(`Cache path: ${cachePath}`);
+        
+        // List cache contents
+        if (fs.existsSync(cachePath)) {
+          const cacheContents = fs.readdirSync(cachePath);
+          console.log('Cache contents:', cacheContents);
+        } else {
+          console.log('Cache directory does not exist');
+        }
+      } catch (err) {
+        console.log('Error checking cache:', err.message);
+      }
+      
       // Don't set executablePath, let Puppeteer try to find it
       executablePath = undefined;
     }

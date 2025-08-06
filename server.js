@@ -1,12 +1,11 @@
 const express = require('express');
-const fs = require('fs');
-const path = require('path');
+const { getBrowser, closeBrowser } = require('./browser-config');
 const app = express();
 
 // Use PORT environment variable for deployment platforms
 const port = process.env.PORT || 8080;
 
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
 // Add CORS headers for RapidAPI
 app.use((req, res, next) => {
@@ -16,130 +15,68 @@ app.use((req, res, next) => {
   next();
 });
 
-// Dynamic puppeteer import based on environment
-async function getPuppeteer() {
-  const puppeteer = require('puppeteer');
-  
-  // Check if we're in a cloud environment (like DigitalOcean)
-  const isCloudEnvironment = process.env.NODE_ENV === 'production' || 
-                            process.env.CONTAINER === 'true' ||
-                            process.env.DOCKER === 'true' ||
-                            process.cwd().includes('/workspace'); // DigitalOcean App Platform
-  
-  if (isCloudEnvironment) {
-    console.log('Cloud environment detected, searching for Chrome executable...');
+// Health check endpoint (required for App Platform)
+app.get('/health', async (req, res) => {
+  try {
+    // Test browser availability
+    const browser = await getBrowser();
+    const version = await browser.version();
     
-    // First check if PUPPETEER_EXECUTABLE_PATH is set (from Dockerfile)
-    let executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
-    
-    if (executablePath && fs.existsSync(executablePath)) {
-      console.log(`Using PUPPETEER_EXECUTABLE_PATH: ${executablePath}`);
-    } else {
-      // Try multiple possible Chrome paths in containerized/cloud environments
-      const possiblePaths = [
-        '/usr/bin/chromium-browser', // Most common in Ubuntu/Debian containers
-        '/usr/bin/chromium',
-        '/app/.apt/usr/bin/google-chrome', // Heroku buildpack path
-        '/usr/bin/google-chrome',
-        '/usr/bin/google-chrome-stable',
-        '/opt/google/chrome/chrome',
-        '/opt/google/chrome/google-chrome'
-      ];
-      
-      executablePath = null;
-      
-      for (const path of possiblePaths) {
-        console.log(`Checking: ${path}`);
-        if (fs.existsSync(path)) {
-          // Check if file is executable
-          try {
-            fs.accessSync(path, fs.constants.F_OK | fs.constants.X_OK);
-            executablePath = path;
-            console.log(`Found Chrome at: ${path}`);
-            break;
-          } catch (err) {
-            console.log(`File exists but not executable: ${path}`);
-          }
-        }
-      }
-      
-      if (!executablePath) {
-        console.log('No Chrome executable found, letting Puppeteer use default');
-        executablePath = undefined;
-      }
-    }
-    
-    return {
-      puppeteer: puppeteer,
-      executablePath: executablePath,
-      args: []
-    };
-  } else {
-    // Use bundled Chromium for local development
-    console.log('Local development environment, using bundled Chromium');
-    return {
-      puppeteer: puppeteer,
-      executablePath: null,
-      args: []
-    };
+    res.json({ 
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || 'development',
+      workingDirectory: process.cwd(),
+      nodeVersion: process.version,
+      puppeteerVersion: version,
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || 'bundled'
+    });
+  } catch (error) {
+    console.error('Health check failed:', error);
+    res.status(500).json({
+      status: 'unhealthy',
+      timestamp: new Date().toISOString(),
+      error: error.message
+    });
   }
-}
+});
 
 // Screenshot endpoint
 app.post('/screenshot', async (req, res) => {
   const { 
     url, 
-    width = 1920, 
-    height = 1080, 
+    width = 1280, 
+    height = 720, 
     fullPage = false, 
     format = 'png',
-    waitStrategy = 'networkidle2', // faster default
-    maxWaitTime = 10000, // configurable wait time
-    blockResources = false // option to block ads/analytics
+    waitStrategy = 'networkidle2',
+    maxWaitTime = 5000,
+    blockResources = false,
+    deviceScaleFactor = 1,
+    quality = 80
   } = req.body;
   
   if (!url) {
     return res.status(400).json({ error: 'URL is required' });
   }
 
-  let browser;
+  // Validate URL
+  try {
+    new URL(url);
+  } catch {
+    return res.status(400).json({ error: 'Invalid URL format' });
+  }
+
+  let page;
   const startTime = Date.now();
   
   try {
-    const { puppeteer, executablePath, args } = await getPuppeteer();
+    const browser = await getBrowser();
+    page = await browser.newPage();
     
-    // Launch browser with optimized settings for production
-    const launchOptions = {
-      headless: 'new',
-      args: [
-        ...args, // Include chrome-aws-lambda args if available
-        '--no-sandbox', 
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage', // overcome limited resource problems
-        '--disable-accelerated-2d-canvas',
-        '--no-first-run',
-        '--no-zygote',
-        '--disable-gpu',
-        '--disable-features=VizDisplayCompositor',
-        '--disable-background-timer-throttling',
-        '--disable-backgrounding-occluded-windows',
-        '--disable-renderer-backgrounding',
-        '--disable-web-security',
-        '--window-size=1920,1080'
-      ]
-    };
-
-    // Use custom executable path if available
-    if (executablePath !== undefined && executablePath !== null) {
-      console.log(`Using Chrome executable: ${executablePath}`);
-      launchOptions.executablePath = executablePath;
-    } else {
-      console.log('No specific executable path set, letting Puppeteer find Chrome');
-    }
-
-    browser = await puppeteer.launch(launchOptions);
-
-    const page = await browser.newPage();
+    // Configure page with timeouts
+    page.setDefaultTimeout(30000);
+    page.setDefaultNavigationTimeout(30000);
     
     // Optional: Block unnecessary resources for faster loading
     if (blockResources) {
@@ -155,20 +92,24 @@ app.post('/screenshot', async (req, res) => {
     }
     
     // Set viewport
-    await page.setViewport({ width, height });
+    await page.setViewport({ 
+      width: Math.min(width, 1920), 
+      height: Math.min(height, 1080),
+      deviceScaleFactor: Math.min(deviceScaleFactor, 2)
+    });
     
-    // Navigate to URL with configurable wait strategy
+    // Navigate to URL
     await page.goto(url, { 
       waitUntil: waitStrategy,
       timeout: 30000 
     });
 
-    // Configurable wait time instead of fixed 2 seconds
+    // Wait for additional content
     if (maxWaitTime > 0) {
       await new Promise(resolve => setTimeout(resolve, Math.min(maxWaitTime, 10000)));
     }
 
-    // Only wait for images if not blocking resources
+    // Wait for images to load if not blocking resources
     if (!blockResources) {
       try {
         await Promise.race([
@@ -176,20 +117,20 @@ app.post('/screenshot', async (req, res) => {
             const selectors = Array.from(document.querySelectorAll("img"));
             await Promise.all(selectors.map(img => {
               if (img.complete) return Promise.resolve();
-              return new Promise((resolve, reject) => {
-                const timeout = setTimeout(() => resolve(), 5000); // 5s max per image
+              return new Promise((resolve) => {
+                const timeout = setTimeout(() => resolve(), 3000);
                 img.addEventListener('load', () => {
                   clearTimeout(timeout);
                   resolve();
                 });
                 img.addEventListener('error', () => {
                   clearTimeout(timeout);
-                  resolve(); // Don't fail on broken images
+                  resolve();
                 });
               });
             }));
           }),
-          new Promise(resolve => setTimeout(resolve, 8000)) // Max 8s total for all images
+          new Promise(resolve => setTimeout(resolve, 5000))
         ]);
       } catch (error) {
         console.warn('Image loading timeout, proceeding with screenshot');
@@ -197,27 +138,28 @@ app.post('/screenshot', async (req, res) => {
     }
 
     // Take screenshot
-    const screenshot = await page.screenshot({
+    const screenshotOptions = {
       type: format,
-      fullPage: fullPage,
-      encoding: 'base64'
-    });
+      fullPage: fullPage
+    };
+    
+    if (format === 'jpeg') {
+      screenshotOptions.quality = Math.min(Math.max(quality, 1), 100);
+    }
+
+    const screenshot = await page.screenshot(screenshotOptions);
 
     const totalTime = Date.now() - startTime;
 
-    res.json({
-      success: true,
-      screenshot: `data:image/${format};base64,${screenshot}`,
-      url: url,
-      dimensions: { width, height },
-      fullPage: fullPage,
-      processingTime: `${totalTime}ms`,
-      settings: {
-        waitStrategy,
-        maxWaitTime,
-        blockResources
-      }
+    // Return binary data for better performance
+    res.set({
+      'Content-Type': `image/${format}`,
+      'Content-Length': screenshot.length,
+      'Cache-Control': 'no-cache',
+      'X-Processing-Time': `${totalTime}ms`
     });
+
+    res.send(screenshot);
 
   } catch (error) {
     console.error('Screenshot error:', error);
@@ -226,8 +168,12 @@ app.post('/screenshot', async (req, res) => {
       message: error.message 
     });
   } finally {
-    if (browser) {
-      await browser.close();
+    if (page) {
+      try {
+        await page.close();
+      } catch (err) {
+        console.warn('Error closing page:', err);
+      }
     }
   }
 });
@@ -235,35 +181,56 @@ app.post('/screenshot', async (req, res) => {
 // Health check endpoint
 app.get('/health', async (req, res) => {
   try {
-    const { executablePath } = await getPuppeteer();
-    const chromeStatus = executablePath ? `Chrome found at: ${executablePath}` : 'Using bundled Chromium or @sparticuz/chromium';
+    // Test browser availability
+    const browser = await getBrowser();
+    const version = await browser.version();
     
     res.json({ 
-      status: 'OK', 
+      status: 'healthy',
       timestamp: new Date().toISOString(),
-      chrome: chromeStatus,
       environment: process.env.NODE_ENV || 'development',
       workingDirectory: process.cwd(),
-      nodeVersion: process.version
+      nodeVersion: process.version,
+      puppeteerVersion: version,
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || 'bundled'
     });
   } catch (error) {
+    console.error('Health check failed:', error);
     res.status(500).json({
-      status: 'ERROR',
+      status: 'unhealthy',
       timestamp: new Date().toISOString(),
       error: error.message
     });
   }
 });
 
-app.listen(port, () => {
+app.listen(port, '0.0.0.0', () => {
   console.log(`Screenshot API running on port ${port}`);
   console.log('Endpoints:');
   console.log('  POST /screenshot - Take a screenshot');
   console.log('  GET /health - Health check');
+  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
 });
 
-// Graceful shutdown
-process.on('SIGINT', () => {
-  console.log('Shutting down gracefully...');
+// Graceful shutdown for App Platform
+process.on('SIGTERM', async () => {
+  console.log('Received SIGTERM, shutting down gracefully...');
+  try {
+    await closeBrowser();
+    console.log('Browser closed successfully');
+  } catch (error) {
+    console.error('Error during shutdown:', error);
+  }
+  process.exit(0);
+});
+
+process.on('SIGINT', async () => {
+  console.log('Received SIGINT, shutting down gracefully...');
+  try {
+    await closeBrowser();
+    console.log('Browser closed successfully');
+  } catch (error) {
+    console.error('Error during shutdown:', error);
+  }
   process.exit(0);
 });

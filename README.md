@@ -44,7 +44,8 @@ Takes a screenshot of the specified URL.
   "format": "png",
   "waitStrategy": "networkidle2",
   "maxWaitTime": 5000,
-  "blockResources": false
+  "blockResources": false,
+  "timeout": 45000
 }
 ```
 
@@ -54,9 +55,10 @@ Takes a screenshot of the specified URL.
 - `height` (optional): Viewport height (100-2160, default: 1080)
 - `fullPage` (optional): Capture full page (default: false)
 - `format` (optional): Image format - 'png' or 'jpeg' (default: 'png')
-- `waitStrategy` (optional): Loading strategy (default: 'networkidle2')
-- `maxWaitTime` (optional): Max wait time in ms (default: 5000)
+- `waitStrategy` (optional): Loading strategy - 'networkidle2', 'networkidle0', 'domcontentloaded', 'load' (default: 'networkidle2')
+- `maxWaitTime` (optional): Additional wait time in ms after page load (default: 5000)
 - `blockResources` (optional): Block CSS/images for faster loading (default: false)
+- `timeout` (optional): Navigation timeout in ms (5000-60000, default: 45000)
 
 **Response:**
 ```json
@@ -70,7 +72,8 @@ Takes a screenshot of the specified URL.
   "settings": {
     "waitStrategy": "networkidle2",
     "maxWaitTime": 5000,
-    "blockResources": false
+    "blockResources": false,
+    "timeout": 45000
   }
 }
 ```
@@ -135,6 +138,55 @@ See [RENDER_DEPLOYMENT.md](./RENDER_DEPLOYMENT.md) for complete deployment instr
 npm install
 npm run dev
 ```
+
+## Troubleshooting
+
+### Navigation Timeout Issues
+
+If you get "Navigation timeout" errors, try these solutions:
+
+**1. Increase timeout (for slow websites):**
+```json
+{
+  "url": "https://slow-website.com",
+  "timeout": 60000
+}
+```
+
+**2. Use faster wait strategy:**
+```json
+{
+  "url": "https://example.com",
+  "waitStrategy": "domcontentloaded",
+  "timeout": 30000
+}
+```
+
+**3. Block resources for faster loading:**
+```json
+{
+  "url": "https://heavy-website.com",
+  "blockResources": true,
+  "waitStrategy": "domcontentloaded"
+}
+```
+
+**4. For very slow sites, combine all optimizations:**
+```json
+{
+  "url": "https://very-slow-site.com",
+  "timeout": 60000,
+  "waitStrategy": "domcontentloaded",
+  "blockResources": true,
+  "maxWaitTime": 2000
+}
+```
+
+### Common Wait Strategies
+- `networkidle2` (default): Wait until there are no more than 2 network requests for 500ms
+- `networkidle0`: Wait until there are no network requests for 500ms  
+- `domcontentloaded`: Wait until DOMContentLoaded event is fired
+- `load`: Wait until the load event is fired
 
 ## Environment Variables
 

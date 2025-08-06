@@ -48,7 +48,8 @@ function testScreenshot() {
       url: 'https://example.com',
       width: 800,
       height: 600,
-      blockResources: true
+      blockResources: true,
+      timeout: 30000
     });
     
     const req = client.request({

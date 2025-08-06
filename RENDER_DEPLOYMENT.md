@@ -42,10 +42,15 @@ After deployment, test your API:
 # Health check
 curl https://your-app-name.onrender.com/health
 
-# Screenshot test
+# Basic screenshot test
 curl -X POST https://your-app-name.onrender.com/screenshot \
   -H "Content-Type: application/json" \
   -d '{"url": "https://example.com", "width": 800, "height": 600}'
+
+# For slow websites, increase timeout
+curl -X POST https://your-app-name.onrender.com/screenshot \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://slow-website.com", "timeout": 60000, "waitStrategy": "domcontentloaded"}'
 ```
 
 ## Important Notes
@@ -69,6 +74,38 @@ curl -X POST https://your-app-name.onrender.com/screenshot \
 - Monitor memory usage in the Render dashboard
 
 ## Troubleshooting
+
+### Navigation Timeout Errors
+
+If you get "Navigation timeout of 20000 ms exceeded" errors:
+
+1. **Increase the timeout parameter:**
+   ```json
+   {
+     "url": "https://slow-website.com",
+     "timeout": 60000
+   }
+   ```
+
+2. **Use a faster wait strategy:**
+   ```json
+   {
+     "url": "https://example.com", 
+     "waitStrategy": "domcontentloaded",
+     "timeout": 45000
+   }
+   ```
+
+3. **Enable resource blocking:**
+   ```json
+   {
+     "url": "https://heavy-website.com",
+     "blockResources": true,
+     "waitStrategy": "domcontentloaded"
+   }
+   ```
+
+### Other Common Issues
 
 If deployment fails:
 1. Check the build logs in Render dashboard

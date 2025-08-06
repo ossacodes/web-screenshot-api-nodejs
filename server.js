@@ -43,7 +43,8 @@ app.post('/screenshot', async (req, res) => {
     format = 'png',
     waitStrategy = 'networkidle2', // faster default
     maxWaitTime = 5000, // reduced for better performance on Render
-    blockResources = false // option to block ads/analytics
+    blockResources = false, // option to block ads/analytics
+    timeout = 45000 // configurable navigation timeout (45s default)
   } = req.body;
   
   if (!url) {
@@ -61,6 +62,13 @@ app.post('/screenshot', async (req, res) => {
   if (width < 100 || width > 3840 || height < 100 || height > 2160) {
     return res.status(400).json({ 
       error: 'Invalid dimensions. Width and height must be between 100-3840 and 100-2160 respectively' 
+    });
+  }
+
+  // Validate timeout
+  if (timeout < 5000 || timeout > 60000) {
+    return res.status(400).json({ 
+      error: 'Invalid timeout. Timeout must be between 5000-60000 ms (5-60 seconds)' 
     });
   }
 
@@ -105,11 +113,28 @@ app.post('/screenshot', async (req, res) => {
     // Set viewport
     await page.setViewport({ width, height });
     
-    // Navigate to URL with configurable wait strategy
-    await page.goto(url, { 
-      waitUntil: waitStrategy,
-      timeout: 20000 // reduced timeout for Render
-    });
+    // Navigate to URL with configurable wait strategy and timeout
+    try {
+      await page.goto(url, { 
+        waitUntil: waitStrategy,
+        timeout: timeout
+      });
+    } catch (error) {
+      if (error.name === 'TimeoutError' || error.message.includes('timeout')) {
+        // Try with a more lenient wait strategy
+        console.log(`Navigation timeout with ${waitStrategy}, trying with 'domcontentloaded'...`);
+        try {
+          await page.goto(url, { 
+            waitUntil: 'domcontentloaded',
+            timeout: Math.min(timeout, 30000)
+          });
+        } catch (fallbackError) {
+          throw new Error(`Navigation timeout: Website took longer than ${timeout}ms to load. Try increasing the timeout parameter or check if the website is accessible.`);
+        }
+      } else {
+        throw error;
+      }
+    }
 
     // Configurable wait time instead of fixed 2 seconds
     if (maxWaitTime > 0) {
@@ -174,15 +199,40 @@ app.post('/screenshot', async (req, res) => {
       settings: {
         waitStrategy,
         maxWaitTime,
-        blockResources
+        blockResources,
+        timeout
       }
     });
 
   } catch (error) {
     console.error('Screenshot error:', error);
-    res.status(500).json({ 
-      error: 'Failed to take screenshot',
-      message: error.message 
+    
+    // Provide more specific error messages
+    let errorMessage = 'Failed to take screenshot';
+    let statusCode = 500;
+    
+    if (error.message.includes('timeout') || error.message.includes('Navigation timeout')) {
+      errorMessage = error.message;
+      statusCode = 408; // Request Timeout
+    } else if (error.message.includes('net::ERR_NAME_NOT_RESOLVED')) {
+      errorMessage = 'Website not found or DNS resolution failed';
+      statusCode = 404;
+    } else if (error.message.includes('net::ERR_CONNECTION_REFUSED')) {
+      errorMessage = 'Connection to website was refused';
+      statusCode = 503;
+    } else if (error.message.includes('net::ERR_CERT_')) {
+      errorMessage = 'SSL certificate error - the website has security issues';
+      statusCode = 502;
+    }
+    
+    res.status(statusCode).json({ 
+      error: errorMessage,
+      originalError: error.message,
+      suggestions: statusCode === 408 ? [
+        'Try increasing the timeout parameter (max 60000ms)',
+        'Use waitStrategy: "domcontentloaded" for faster loading',
+        'Enable blockResources: true to skip images/CSS'
+      ] : []
     });
   } finally {
     if (browser) {

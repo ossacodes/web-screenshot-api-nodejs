@@ -18,35 +18,20 @@ app.use((req, res, next) => {
 
 // Dynamic puppeteer import based on environment
 async function getPuppeteer() {
+  const puppeteer = require('puppeteer');
+  
   // Check if we're in a cloud environment (like DigitalOcean)
   const isCloudEnvironment = process.env.NODE_ENV === 'production' || 
                             process.env.CONTAINER === 'true' ||
                             process.env.DOCKER === 'true' ||
                             process.cwd().includes('/workspace'); // DigitalOcean App Platform
   
-  if (isCloudEnvironment && !process.env.DOCKER) {
-    // Use @sparticuz/chromium for cloud platforms without Docker
-    console.log('Using @sparticuz/chromium for cloud deployment');
-    const chromium = require('@sparticuz/chromium');
-    const puppeteer = require('puppeteer-core');
-    
-    const executablePath = await chromium.executablePath();
-    console.log('@sparticuz/chromium executable path:', executablePath);
-    console.log('@sparticuz/chromium args:', chromium.args);
-    
-    return {
-      puppeteer: puppeteer,
-      executablePath: executablePath,
-      args: chromium.args
-    };
-  }
-  
-  // For Docker or local development, use regular puppeteer
-  const puppeteer = require('puppeteer');
-  
   if (isCloudEnvironment) {
-    // Try multiple possible Chrome paths in containerized environments
+    console.log('Cloud environment detected, searching for Chrome executable...');
+    
+    // Try multiple possible Chrome paths in containerized/cloud environments
     const possiblePaths = [
+      '/app/.apt/usr/bin/google-chrome', // Heroku buildpack path
       '/usr/bin/google-chrome',
       '/usr/bin/google-chrome-stable',
       '/usr/bin/chromium-browser',
@@ -58,7 +43,6 @@ async function getPuppeteer() {
     const fs = require('fs');
     let executablePath = null;
     
-    console.log('Searching for Chrome executable...');
     for (const path of possiblePaths) {
       console.log(`Checking: ${path}`);
       if (fs.existsSync(path)) {
@@ -75,45 +59,7 @@ async function getPuppeteer() {
     }
     
     if (!executablePath) {
-      console.error('Chrome not found at any expected paths:', possiblePaths);
-      console.log('Attempting to let Puppeteer find Chrome automatically...');
-      
-      // Try to install Chrome via Puppeteer as last resort
-      try {
-        console.log('Attempting to install Chrome via Puppeteer...');
-        const { execSync } = require('child_process');
-        
-        // Install Chrome using Puppeteer
-        execSync('npx puppeteer browsers install chrome', { 
-          stdio: 'pipe',
-          timeout: 120000 // 2 minutes timeout
-        });
-        
-        console.log('Chrome installation completed via Puppeteer');
-        
-        // Check the cache again after installation
-        const cachePath = process.env.PUPPETEER_CACHE_DIR || process.env.HOME + '/.cache/puppeteer' || '/workspace/.cache/puppeteer';
-        console.log(`Checking cache path: ${cachePath}`);
-        
-        if (fs.existsSync(cachePath)) {
-          const cacheContents = fs.readdirSync(cachePath, { recursive: true });
-          console.log('Cache contents after installation:', cacheContents);
-          
-          // Look for Chrome executable in the cache
-          const chromeExecutables = cacheContents.filter(file => 
-            typeof file === 'string' && (file.includes('chrome') || file.includes('Chrome'))
-          );
-          
-          if (chromeExecutables.length > 0) {
-            console.log('Found Chrome executables in cache:', chromeExecutables);
-          }
-        }
-        
-      } catch (installError) {
-        console.log('Failed to install Chrome via Puppeteer:', installError.message);
-      }
-      
-      // Don't set executablePath, let Puppeteer try to find it
+      console.log('No Chrome executable found, letting Puppeteer use default');
       executablePath = undefined;
     }
     
@@ -124,6 +70,7 @@ async function getPuppeteer() {
     };
   } else {
     // Use bundled Chromium for local development
+    console.log('Local development environment, using bundled Chromium');
     return {
       puppeteer: puppeteer,
       executablePath: null,

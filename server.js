@@ -25,13 +25,18 @@ async function getPuppeteer() {
                             process.cwd().includes('/workspace'); // DigitalOcean App Platform
   
   if (isCloudEnvironment && !process.env.DOCKER) {
-    // Use chrome-aws-lambda for cloud platforms without Docker
-    console.log('Using chrome-aws-lambda for cloud deployment');
-    const chromium = require('chrome-aws-lambda');
+    // Use @sparticuz/chromium for cloud platforms without Docker
+    console.log('Using @sparticuz/chromium for cloud deployment');
+    const chromium = require('@sparticuz/chromium');
+    const puppeteer = require('puppeteer-core');
+    
+    const executablePath = await chromium.executablePath();
+    console.log('@sparticuz/chromium executable path:', executablePath);
+    console.log('@sparticuz/chromium args:', chromium.args);
     
     return {
-      puppeteer: chromium.puppeteer,
-      executablePath: await chromium.executablePath,
+      puppeteer: puppeteer,
+      executablePath: executablePath,
       args: chromium.args
     };
   }
@@ -278,7 +283,7 @@ app.post('/screenshot', async (req, res) => {
 app.get('/health', async (req, res) => {
   try {
     const { executablePath } = await getPuppeteer();
-    const chromeStatus = executablePath ? `Chrome found at: ${executablePath}` : 'Using bundled Chromium or chrome-aws-lambda';
+    const chromeStatus = executablePath ? `Chrome found at: ${executablePath}` : 'Using bundled Chromium or @sparticuz/chromium';
     
     res.json({ 
       status: 'OK', 

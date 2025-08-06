@@ -7,7 +7,7 @@ services:
     branch: main
     deploy_on_push: true
   run_command: npm start
-  build_command: npm install
+  build_command: ./build.sh
   environment_slug: node-js
   instance_count: 1
   instance_size_slug: basic-xxs
@@ -17,7 +17,3 @@ services:
   envs:
   - key: NODE_ENV
     value: production
-  - key: PUPPETEER_SKIP_CHROMIUM_DOWNLOAD
-    value: "false"
-  - key: PUPPETEER_ARGS
-    value: "--no-sandbox,--disable-setuid-sandbox,--disable-dev-shm-usage,--single-process"

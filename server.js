@@ -65,28 +65,11 @@ app.post('/screenshot', async (req, res) => {
       args: browserArgs
     };
 
-    // Try to use system Chrome in production environments
-    if (process.env.NODE_ENV === 'production') {
-      // Try different possible Chrome paths
-      const possiblePaths = [
-        process.env.PUPPETEER_EXECUTABLE_PATH,
-        '/usr/bin/chromium',
-        '/usr/bin/chromium-browser', 
-        '/usr/bin/google-chrome',
-        '/usr/bin/google-chrome-stable'
-      ].filter(Boolean);
-
-      for (const path of possiblePaths) {
-        try {
-          const fs = require('fs');
-          if (fs.existsSync(path)) {
-            launchOptions.executablePath = path;
-            break;
-          }
-        } catch (e) {
-          // Continue trying other paths
-        }
-      }
+    // For DigitalOcean App Platform and similar environments,
+    // let Puppeteer use its bundled Chromium instead of trying to find system Chrome
+    // Only set executablePath if explicitly provided via environment variable
+    if (process.env.PUPPETEER_EXECUTABLE_PATH && process.env.PUPPETEER_EXECUTABLE_PATH !== '/usr/bin/chromium') {
+      launchOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
     }
 
     browser = await puppeteer.launch(launchOptions);

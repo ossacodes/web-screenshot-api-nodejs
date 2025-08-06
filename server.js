@@ -31,24 +31,35 @@ async function getPuppeteer() {
       '/usr/bin/google-chrome',
       '/usr/bin/google-chrome-stable',
       '/usr/bin/chromium-browser',
-      '/usr/bin/chromium'
+      '/usr/bin/chromium',
+      '/opt/google/chrome/chrome',
+      '/opt/google/chrome/google-chrome'
     ];
     
     const fs = require('fs');
     let executablePath = null;
     
+    console.log('Searching for Chrome executable...');
     for (const path of possiblePaths) {
+      console.log(`Checking: ${path}`);
       if (fs.existsSync(path)) {
-        executablePath = path;
-        console.log(`Found Chrome at: ${path}`);
-        break;
+        // Check if file is executable
+        try {
+          fs.accessSync(path, fs.constants.F_OK | fs.constants.X_OK);
+          executablePath = path;
+          console.log(`Found Chrome at: ${path}`);
+          break;
+        } catch (err) {
+          console.log(`File exists but not executable: ${path}`);
+        }
       }
     }
     
     if (!executablePath) {
       console.error('Chrome not found at any expected paths:', possiblePaths);
-      // Fall back to letting Puppeteer find Chrome
-      executablePath = null;
+      console.log('Attempting to let Puppeteer find Chrome automatically...');
+      // Don't set executablePath, let Puppeteer try to find it
+      executablePath = undefined;
     }
     
     return {
@@ -109,8 +120,11 @@ app.post('/screenshot', async (req, res) => {
     };
 
     // Use custom executable path if available
-    if (executablePath) {
+    if (executablePath !== undefined && executablePath !== null) {
+      console.log(`Using Chrome executable: ${executablePath}`);
       launchOptions.executablePath = executablePath;
+    } else {
+      console.log('No specific executable path set, letting Puppeteer find Chrome');
     }
 
     browser = await puppeteer.launch(launchOptions);
@@ -212,13 +226,15 @@ app.post('/screenshot', async (req, res) => {
 app.get('/health', async (req, res) => {
   try {
     const { executablePath } = await getPuppeteer();
-    const chromeStatus = executablePath ? `Chrome found at: ${executablePath}` : 'Using bundled Chromium';
+    const chromeStatus = executablePath ? `Chrome found at: ${executablePath}` : 'Using bundled Chromium or letting Puppeteer find Chrome';
     
     res.json({ 
       status: 'OK', 
       timestamp: new Date().toISOString(),
       chrome: chromeStatus,
-      environment: process.env.NODE_ENV || 'development'
+      environment: process.env.NODE_ENV || 'development',
+      workingDirectory: process.cwd(),
+      nodeVersion: process.version
     });
   } catch (error) {
     res.status(500).json({

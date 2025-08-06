@@ -4,7 +4,7 @@ const path = require('path');
 const app = express();
 
 // Use PORT environment variable for deployment platforms
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 8080;
 
 app.use(express.json());
 
@@ -29,38 +29,44 @@ async function getPuppeteer() {
   if (isCloudEnvironment) {
     console.log('Cloud environment detected, searching for Chrome executable...');
     
-    // Try multiple possible Chrome paths in containerized/cloud environments
-    const possiblePaths = [
-      '/app/.apt/usr/bin/google-chrome', // Heroku buildpack path
-      '/usr/bin/google-chrome',
-      '/usr/bin/google-chrome-stable',
-      '/usr/bin/chromium-browser',
-      '/usr/bin/chromium',
-      '/opt/google/chrome/chrome',
-      '/opt/google/chrome/google-chrome'
-    ];
+    // First check if PUPPETEER_EXECUTABLE_PATH is set (from Dockerfile)
+    let executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
     
-    const fs = require('fs');
-    let executablePath = null;
-    
-    for (const path of possiblePaths) {
-      console.log(`Checking: ${path}`);
-      if (fs.existsSync(path)) {
-        // Check if file is executable
-        try {
-          fs.accessSync(path, fs.constants.F_OK | fs.constants.X_OK);
-          executablePath = path;
-          console.log(`Found Chrome at: ${path}`);
-          break;
-        } catch (err) {
-          console.log(`File exists but not executable: ${path}`);
+    if (executablePath && fs.existsSync(executablePath)) {
+      console.log(`Using PUPPETEER_EXECUTABLE_PATH: ${executablePath}`);
+    } else {
+      // Try multiple possible Chrome paths in containerized/cloud environments
+      const possiblePaths = [
+        '/usr/bin/chromium-browser', // Most common in Ubuntu/Debian containers
+        '/usr/bin/chromium',
+        '/app/.apt/usr/bin/google-chrome', // Heroku buildpack path
+        '/usr/bin/google-chrome',
+        '/usr/bin/google-chrome-stable',
+        '/opt/google/chrome/chrome',
+        '/opt/google/chrome/google-chrome'
+      ];
+      
+      executablePath = null;
+      
+      for (const path of possiblePaths) {
+        console.log(`Checking: ${path}`);
+        if (fs.existsSync(path)) {
+          // Check if file is executable
+          try {
+            fs.accessSync(path, fs.constants.F_OK | fs.constants.X_OK);
+            executablePath = path;
+            console.log(`Found Chrome at: ${path}`);
+            break;
+          } catch (err) {
+            console.log(`File exists but not executable: ${path}`);
+          }
         }
       }
-    }
-    
-    if (!executablePath) {
-      console.log('No Chrome executable found, letting Puppeteer use default');
-      executablePath = undefined;
+      
+      if (!executablePath) {
+        console.log('No Chrome executable found, letting Puppeteer use default');
+        executablePath = undefined;
+      }
     }
     
     return {

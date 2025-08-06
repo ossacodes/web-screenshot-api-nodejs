@@ -22,7 +22,11 @@ RUN apt-get update && apt-get install -y \
   libgbm-dev \
   chromium-browser \
   --no-install-recommends && \
-  rm -rf /var/lib/apt/lists/*
+  rm -rf /var/lib/apt/lists/* && \
+  # Verify chromium installation and create symlink if needed
+  ls -la /usr/bin/chromium* && \
+  # Create symlink for compatibility if chromium exists but not chromium-browser
+  ([ -f /usr/bin/chromium ] && [ ! -f /usr/bin/chromium-browser ] && ln -s /usr/bin/chromium /usr/bin/chromium-browser) || true
 
 # Set Puppeteer to skip its own Chromium download
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
@@ -39,7 +43,7 @@ RUN npm install
 COPY . .
 
 # Expose port
-EXPOSE 3000
+EXPOSE 8080
 
 # Start app
 CMD ["node", "server.js"]

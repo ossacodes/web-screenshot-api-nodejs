@@ -1,6 +1,6 @@
 FROM node:20-slim
 
-# Install necessary dependencies and Chromium
+# Install dependencies and Chromium
 RUN apt-get update && apt-get install -y \
   wget \
   ca-certificates \
@@ -20,24 +20,25 @@ RUN apt-get update && apt-get install -y \
   libxrandr2 \
   xdg-utils \
   libgbm-dev \
-  chromium \
-  --no-install-recommends && rm -rf /var/lib/apt/lists/*
+  chromium-browser \
+  --no-install-recommends && \
+  rm -rf /var/lib/apt/lists/*
 
-# Set env so Puppeteer won't download Chromium
+# Set Puppeteer to skip its own Chromium download
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
-ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 
 # Set working directory
 WORKDIR /app
 
-# Copy and install dependencies
+# Copy package files and install
 COPY package*.json ./
 RUN npm install
 
-# Copy rest of your app
+# Copy remaining app files
 COPY . .
 
-# Expose the port
+# Expose port
 EXPOSE 3000
 
 # Start app

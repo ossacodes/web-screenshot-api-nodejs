@@ -18,16 +18,21 @@ app.use((req, res, next) => {
 
 // Dynamic puppeteer import based on environment
 async function getPuppeteer() {
-  try {
-    // Try to use chrome-aws-lambda for production environments
-    const chromium = require('chrome-aws-lambda');
+  const puppeteer = require('puppeteer');
+  
+  // Check if we're in a containerized environment (like DigitalOcean)
+  const isContainer = process.env.NODE_ENV === 'production' || 
+                     process.env.CONTAINER === 'true' ||
+                     process.env.DOCKER === 'true';
+  
+  if (isContainer) {
+    // Use system Chrome in containerized environments
     return {
-      puppeteer: chromium.puppeteer,
-      executablePath: await chromium.executablePath
+      puppeteer: puppeteer,
+      executablePath: '/usr/bin/google-chrome-stable'
     };
-  } catch (error) {
-    // Fall back to regular puppeteer for local development
-    const puppeteer = require('puppeteer');
+  } else {
+    // Use bundled Chromium for local development
     return {
       puppeteer: puppeteer,
       executablePath: null
@@ -69,15 +74,17 @@ app.post('/screenshot', async (req, res) => {
         '--no-first-run',
         '--no-zygote',
         '--disable-gpu',
-        '--single-process', // Important for some hosting platforms
         '--disable-features=VizDisplayCompositor',
         '--disable-background-timer-throttling',
         '--disable-backgrounding-occluded-windows',
-        '--disable-renderer-backgrounding'
+        '--disable-renderer-backgrounding',
+        '--disable-web-security',
+        '--disable-features=VizDisplayCompositor',
+        '--window-size=1920,1080'
       ]
     };
 
-    // Use custom executable path if available (for chrome-aws-lambda)
+    // Use custom executable path if available
     if (executablePath) {
       launchOptions.executablePath = executablePath;
     }

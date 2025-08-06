@@ -13,6 +13,11 @@ RUN apt-get update \
 # Create app directory
 WORKDIR /usr/src/app
 
+# Set environment variables
+ENV NODE_ENV=production
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable
+
 # Copy package files
 COPY package*.json ./
 

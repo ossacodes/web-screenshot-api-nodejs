@@ -5,6 +5,13 @@ const path = require('path');
 const app = express();
 const port = process.env.PORT || 3000;
 
+// Increase memory limit for Node.js
+if (process.env.NODE_OPTIONS) {
+  process.env.NODE_OPTIONS += ' --max-old-space-size=512';
+} else {
+  process.env.NODE_OPTIONS = '--max-old-space-size=512';
+}
+
 app.use(express.json());
 
 // Add CORS headers for API usage
@@ -44,7 +51,8 @@ app.post('/screenshot', async (req, res) => {
     waitStrategy = 'networkidle2', // faster default
     maxWaitTime = 5000, // reduced for better performance on Render
     blockResources = false, // option to block ads/analytics
-    timeout = 45000 // configurable navigation timeout (45s default)
+    timeout = 45000, // configurable navigation timeout (45s default)
+    lowMemoryMode = false // simplified mode for very low memory environments
   } = req.body;
   
   if (!url) {
@@ -75,34 +83,76 @@ app.post('/screenshot', async (req, res) => {
   let browser;
   const startTime = Date.now();
   
+  // Log memory before starting
+  const memBefore = process.memoryUsage();
+  console.log('Memory before screenshot:', Math.round(memBefore.heapUsed / 1024 / 1024) + ' MB');
+  
   try {
     // Launch browser with optimized settings for Render.com
+    const browserArgs = [
+      '--no-sandbox', 
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage', // overcome limited resource problems
+      '--disable-accelerated-2d-canvas',
+      '--no-first-run',
+      '--no-zygote',
+      '--disable-gpu',
+      '--single-process', // Important for Render.com
+      '--disable-web-security',
+      '--disable-features=VizDisplayCompositor',
+      '--memory-pressure-off', // Disable memory pressure notifications
+      '--max_old_space_size=512', // Limit memory usage
+      '--disable-background-timer-throttling',
+      '--disable-backgrounding-occluded-windows',
+      '--disable-renderer-backgrounding'
+    ];
+
+    // Add extra memory optimizations for low memory mode
+    if (lowMemoryMode) {
+      browserArgs.push(
+        '--disable-extensions',
+        '--disable-plugins',
+        '--disable-images',
+        '--disable-javascript',
+        '--aggressive-cache-discard'
+      );
+    }
+
     browser = await puppeteer.launch({
       headless: 'new',
-      args: [
-        '--no-sandbox', 
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage', // overcome limited resource problems
-        '--disable-accelerated-2d-canvas',
-        '--no-first-run',
-        '--no-zygote',
-        '--disable-gpu',
-        '--single-process', // Important for Render.com
-        '--no-sandbox',
-        '--disable-web-security',
-        '--disable-features=VizDisplayCompositor'
-      ],
-      executablePath: puppeteer.executablePath()
+      args: browserArgs,
+      executablePath: puppeteer.executablePath(),
+      defaultViewport: null,
+      timeout: 30000 // Browser launch timeout
     });
+
+    console.log('Browser launched successfully');
 
     const page = await browser.newPage();
     
+    // Set memory and performance optimizations
+    await page.setDefaultNavigationTimeout(timeout);
+    await page.setDefaultTimeout(30000);
+    
+    // Optimize page settings for low memory
+    await page.evaluateOnNewDocument(() => {
+      // Disable some heavy features
+      Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+    });
+    
     // Optional: Block unnecessary resources for faster loading
-    if (blockResources) {
+    if (blockResources || lowMemoryMode) {
       await page.setRequestInterception(true);
       page.on('request', (req) => {
         const resourceType = req.resourceType();
-        if (['stylesheet', 'font', 'image'].includes(resourceType)) {
+        const url = req.url();
+        
+        // Block unnecessary resources to save memory
+        if (['stylesheet', 'font', 'image', 'media'].includes(resourceType) ||
+            url.includes('google-analytics') ||
+            url.includes('facebook.com') ||
+            url.includes('doubleclick') ||
+            url.includes('googletagmanager')) {
           req.abort();
         } else {
           req.continue();
@@ -187,6 +237,10 @@ app.post('/screenshot', async (req, res) => {
 
     const totalTime = Date.now() - startTime;
 
+    // Log memory after screenshot
+    const memAfter = process.memoryUsage();
+    console.log('Memory after screenshot:', Math.round(memAfter.heapUsed / 1024 / 1024) + ' MB');
+
     res.json({
       success: true,
       screenshot: `data:image/${format};base64,${screenshot}`,
@@ -200,7 +254,8 @@ app.post('/screenshot', async (req, res) => {
         waitStrategy,
         maxWaitTime,
         blockResources,
-        timeout
+        timeout,
+        lowMemoryMode
       }
     });
 
@@ -236,25 +291,75 @@ app.post('/screenshot', async (req, res) => {
     });
   } finally {
     if (browser) {
-      await browser.close();
+      try {
+        await browser.close();
+        console.log('Browser closed successfully');
+      } catch (closeError) {
+        console.error('Error closing browser:', closeError);
+      }
+    }
+    
+    // Force garbage collection if available
+    if (global.gc) {
+      global.gc();
     }
   }
 });
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-  res.json({ status: 'OK', timestamp: new Date().toISOString() });
+  const memUsage = process.memoryUsage();
+  res.json({ 
+    status: 'OK', 
+    timestamp: new Date().toISOString(),
+    memory: {
+      rss: Math.round(memUsage.rss / 1024 / 1024) + ' MB',
+      heapUsed: Math.round(memUsage.heapUsed / 1024 / 1024) + ' MB',
+      heapTotal: Math.round(memUsage.heapTotal / 1024 / 1024) + ' MB'
+    },
+    uptime: Math.round(process.uptime()) + ' seconds',
+    nodeVersion: process.version
+  });
 });
 
 app.listen(port, '0.0.0.0', () => {
   console.log(`Screenshot API running on port ${port}`);
+  console.log('Node.js version:', process.version);
+  console.log('Memory usage:', process.memoryUsage());
   console.log('Endpoints:');
   console.log('  POST /screenshot - Take a screenshot');
   console.log('  GET /health - Health check');
 });
 
-// Graceful shutdown
-process.on('SIGINT', () => {
-  console.log('Shutting down gracefully...');
+// Handle process termination gracefully
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received, shutting down gracefully...');
   process.exit(0);
 });
+
+process.on('SIGINT', () => {
+  console.log('SIGINT received, shutting down gracefully...');
+  process.exit(0);
+});
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  process.exit(1);
+});
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  process.exit(1);
+});
+
+// Memory monitoring
+setInterval(() => {
+  const usage = process.memoryUsage();
+  console.log('Memory usage:', {
+    rss: Math.round(usage.rss / 1024 / 1024) + ' MB',
+    heapUsed: Math.round(usage.heapUsed / 1024 / 1024) + ' MB',
+    heapTotal: Math.round(usage.heapTotal / 1024 / 1024) + ' MB'
+  });
+}, 60000); // Log every minute

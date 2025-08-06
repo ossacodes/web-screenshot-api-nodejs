@@ -4,9 +4,9 @@
   "description": "Screenshot API for RapidAPI - Take website screenshots programmatically",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
+    "start": "node --max-old-space-size=512 start.js",
     "build": "npm install",
-    "dev": "nodemon server.js",
+    "dev": "nodemon --max-old-space-size=512 server.js",
     "test": "node test-api.js",
     "test:remote": "node test-api.js"
   },

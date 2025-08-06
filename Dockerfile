@@ -1,6 +1,9 @@
 # Use the official Node.js runtime as the base image
 FROM node:18-slim
 
+# Set memory limits
+ENV NODE_OPTIONS="--max-old-space-size=512"
+
 # Install dependencies for Chrome
 RUN apt-get update && apt-get install -y \
     ca-certificates \

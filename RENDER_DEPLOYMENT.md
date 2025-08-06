@@ -75,6 +75,38 @@ curl -X POST https://your-app-name.onrender.com/screenshot \
 
 ## Troubleshooting
 
+### SIGTERM Errors and Memory Issues
+
+If you see `npm error signal SIGTERM` or the app crashes:
+
+1. **Memory optimization request:**
+   ```json
+   {
+     "url": "https://example.com",
+     "lowMemoryMode": true,
+     "blockResources": true,
+     "waitStrategy": "domcontentloaded"
+   }
+   ```
+
+2. **Upgrade your Render plan:**
+   - Starter plan has limited memory (512MB)
+   - Consider upgrading to Standard plan for more memory
+
+3. **Check memory usage:**
+   ```bash
+   curl https://your-app.onrender.com/health
+   ```
+
+4. **Use smaller dimensions:**
+   ```json
+   {
+     "url": "https://example.com",
+     "width": 800,
+     "height": 600
+   }
+   ```
+
 ### Navigation Timeout Errors
 
 If you get "Navigation timeout of 20000 ms exceeded" errors:

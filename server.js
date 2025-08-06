@@ -43,25 +43,53 @@ app.post('/screenshot', async (req, res) => {
   
   try {
     // Launch browser with optimized settings for cloud deployment
-    browser = await puppeteer.launch({
+    const browserArgs = [
+      '--no-sandbox', 
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage', // overcome limited resource problems
+      '--disable-accelerated-2d-canvas',
+      '--no-first-run',
+      '--no-zygote',
+      '--disable-gpu',
+      '--disable-web-security',
+      '--disable-features=VizDisplayCompositor'
+    ];
+
+    // Add single-process for limited memory environments
+    if (process.env.NODE_ENV === 'production') {
+      browserArgs.push('--single-process');
+    }
+
+    const launchOptions = {
       headless: 'new',
-      args: [
-        '--no-sandbox', 
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage', // overcome limited resource problems
-        '--disable-accelerated-2d-canvas',
-        '--no-first-run',
-        '--no-zygote',
-        '--disable-gpu',
-        '--disable-web-security',
-        '--disable-features=VizDisplayCompositor',
-        '--single-process' // Important for DigitalOcean
-      ],
-      // Use system Chrome in Docker/cloud environments
-      executablePath: process.env.NODE_ENV === 'production' 
-        ? process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium-browser'
-        : undefined
-    });
+      args: browserArgs
+    };
+
+    // Try to use system Chrome in production environments
+    if (process.env.NODE_ENV === 'production') {
+      // Try different possible Chrome paths
+      const possiblePaths = [
+        process.env.PUPPETEER_EXECUTABLE_PATH,
+        '/usr/bin/chromium',
+        '/usr/bin/chromium-browser', 
+        '/usr/bin/google-chrome',
+        '/usr/bin/google-chrome-stable'
+      ].filter(Boolean);
+
+      for (const path of possiblePaths) {
+        try {
+          const fs = require('fs');
+          if (fs.existsSync(path)) {
+            launchOptions.executablePath = path;
+            break;
+          }
+        } catch (e) {
+          // Continue trying other paths
+        }
+      }
+    }
+
+    browser = await puppeteer.launch(launchOptions);
 
     const page = await browser.newPage();
     
